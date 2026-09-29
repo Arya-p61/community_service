@@ -1,0 +1,14 @@
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import Brand from "../components/Brand";
+import { useAuth } from "../context/AuthContext";
+
+export default function Login() {
+  const { login } = useAuth(); const navigate = useNavigate(); const location = useLocation();
+  const [form, setForm] = useState({ email: "", password: "" }); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
+  const submit = async (event) => { event.preventDefault(); setError(""); setBusy(true); try { const user = await login(form); navigate(location.state?.from?.pathname || `/${user.role}/dashboard`, { replace: true }); } catch { setError("We couldn't sign you in. Check your email and password."); } finally { setBusy(false); } };
+  return <AuthFrame eyebrow="Welcome back" title="Your community, in motion." detail="Sign in to follow the things that matter on your street."><form className="form-stack" onSubmit={submit}><Field label="Email" type="email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} placeholder="you@example.com" required /><Field label="Password" type="password" value={form.password} onChange={(value) => setForm({ ...form, password: value })} placeholder="Enter your password" required />{error && <p className="form-error">{error}</p>}<button className="button button-primary button-wide" disabled={busy}>{busy ? <><span className="spinner spinner-light" />Signing in...</> : "Sign in"}</button><div className="form-links"><Link to="/forgot-password">Forgot password?</Link><span>New here? <Link to="/register">Create an account</Link></span></div></form></AuthFrame>;
+}
+
+function AuthFrame({ eyebrow, title, detail, children }) { return <div className="auth-page"><div className="auth-aside"><Brand /><div className="aside-copy"><p className="eyebrow">Civic life, made easier</p><h2>Small actions can change the shape of a whole neighborhood.</h2><p>CommonGround gives residents a clear, welcoming way to connect with local services.</p></div><span className="aside-note">A better way to be heard.</span></div><div className="auth-panel"><div className="mobile-brand"><Brand /></div><div className="auth-card"><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="auth-detail">{detail}</p>{children}</div></div></div>; }
+export function Field({ label, type = "text", value, onChange, placeholder, required }) { return <label className="field"><span>{label}</span><input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} /></label>; }

@@ -1,0 +1,4 @@
+import { Link } from "react-router-dom";
+import Brand from "../components/Brand";
+import { Field } from "./Login";
+export default function ForgotPassword() { return <div className="simple-page"><Brand /><div className="simple-card"><p className="eyebrow">Account access</p><h1>Reset your password.</h1><p className="auth-detail">Password recovery will be connected to email delivery in the next module. For now, contact your service administrator.</p><form className="form-stack"><Field label="Email" type="email" placeholder="you@example.com" required /><button className="button button-primary button-wide" type="button">Request reset link</button></form><Link className="back-link" to="/login">← Back to sign in</Link></div></div>; }
