@@ -1,0 +1,17 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import RequestStatus from "../components/RequestStatus";
+import { getMyRequests } from "../services/requestService";
+
+const dateLabel = (date) => new Date(date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+export default function RequestList() {
+  const [requests, setRequests] = useState([]); const [query, setQuery] = useState(""); const [status, setStatus] = useState("ALL"); const [state, setState] = useState({ loading: true, error: "" });
+  useEffect(() => { getMyRequests().then((data) => setRequests(data)).catch(() => setState({ loading: false, error: "Unable to load your requests. Please try again." })).finally(() => setState((current) => ({ ...current, loading: false }))); }, []);
+  const filtered = useMemo(() => requests.filter((request) => (status === "ALL" || request.status === status) && `${request.title} ${request.description} ${request.location}`.toLowerCase().includes(query.toLowerCase())), [requests, query, status]);
+  return <div className="requests-page"><div className="page-heading"><div><p className="eyebrow">Your civic activity</p><h1>My service requests</h1><p>Keep track of the issues you’ve raised in your community.</p></div><Link className="button button-primary" to="/citizen/requests/new">+ Report an issue</Link></div><div className="request-tools"><label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your requests" /></label><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option><option value="SUBMITTED">Submitted</option><option value="PENDING">Pending</option><option value="IN_PROGRESS">In progress</option><option value="RESOLVED">Resolved</option><option value="CLOSED">Closed</option></select></div>{state.loading ? <Loading /> : state.error ? <ErrorState message={state.error} /> : filtered.length === 0 ? <EmptyState hasRequests={requests.length > 0} /> : <div className="request-list">{filtered.map((request) => <Link className="request-card" to={`/citizen/requests/${request.id}`} key={request.id}><div className="request-card-top"><span className="request-id">REQ-{String(request.id).padStart(3, "0")}</span><RequestStatus status={request.status} /></div><h2>{request.title}</h2><p>{request.description}</p><div className="request-card-meta"><span>⌖ {request.location}</span><span>{dateLabel(request.created_at)}</span></div><span className="request-arrow">→</span></Link>)}</div>}</div>;
+}
+
+function Loading() { return <div className="request-feedback"><span className="spinner" />Loading your requests...</div>; }
+function ErrorState({ message }) { return <div className="request-feedback request-feedback-error"><strong>{message}</strong><button className="button button-ghost" onClick={() => window.location.reload()}>Try again</button></div>; }
+function EmptyState({ hasRequests }) { return <div className="request-feedback"><span className="empty-icon">✦</span><h2>{hasRequests ? "No matching requests" : "Nothing reported yet"}</h2><p>{hasRequests ? "Try a different search or status filter." : "You haven’t submitted any service requests yet."}</p>{!hasRequests && <Link className="button button-primary" to="/citizen/requests/new">Report an issue</Link>}</div>; }

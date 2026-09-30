@@ -53,3 +53,31 @@ Request fields: `name`, `phone`, and `profile_image`. Email and role cannot be c
 ## Logout
 
 Logout is handled by the frontend: it deletes the local access token, refresh token, and cached profile. Refresh-token rotation and blacklist support prevent rotated refresh tokens from being reused. A server-side access-token blacklist is not needed because access tokens are short-lived.
+
+# Service Request API
+
+Base URL: `http://localhost:8000/api/requests`
+
+All endpoints require `Authorization: Bearer <access-token>`. Citizens can only access their own requests.
+
+## `POST /`
+
+Creates a request. Use JSON for text-only requests or multipart form data when attaching an image. Required fields are `title`, `description`, and `location`; `latitude`, `longitude`, and `image` are optional. The backend sets `user` from the JWT and always sets `status` to `SUBMITTED`.
+
+## `GET /`
+
+Returns the authenticated citizen’s requests only. No user ID is accepted from the client.
+
+## `GET /<id>/`
+
+Returns one owned request. A request owned by another citizen is indistinguishable from a missing request and returns `404`.
+
+## `PATCH /<id>/`
+
+Updates `title`, `description`, `location`, `latitude`, `longitude`, or `image`. `user`, `status`, `created_at`, and `updated_at` are read-only. Editing is rejected once a request is `IN_PROGRESS`, `RESOLVED`, or `CLOSED`.
+
+## `DELETE /<id>/`
+
+Cancels the request by deleting it while status is `SUBMITTED` or `PENDING`. Deletion is rejected after work has progressed.
+
+Supported statuses are `SUBMITTED`, `PENDING`, `IN_PROGRESS`, `RESOLVED`, and `CLOSED`. Image uploads are stored under local `MEDIA_ROOT/request_images/` and limited to 5 MB.

@@ -1,8 +1,8 @@
 # Community Service Request Management System
 
-## Module 1 - Foundation & Authentication
+## Modules 1 and 2 - Foundation, Authentication & Service Requests
 
-This module provides the foundation for a civic service platform: custom-user authentication, JWT sessions, role-based access, profile management, and responsive React pages. Complaint workflows, AI classification, departments, notifications, feedback, maps, analytics, and chat are intentionally reserved for later modules.
+The project provides custom-user authentication, JWT sessions, role-based access, profile management, and citizen service-request workflows. AI classification, departments, notifications, feedback, maps, analytics, and chat are intentionally reserved for later modules.
 
 ## Technologies
 
@@ -21,6 +21,8 @@ community_service/
     ├── manage.py
     ├── config/
     ├── users/
+    ├── service_requests/
+    ├── media/ (created at runtime for local uploads)
     └── requirements.txt
 ```
 
@@ -43,6 +45,8 @@ python manage.py runserver
 ```
 
 The API runs at `http://localhost:8000`. The Django admin is at `/admin/`.
+
+Uploaded request images are stored locally under `backend/media/request_images/` during development. Set `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and `DB_PORT` in `backend/.env` to use MySQL; leaving `DB_NAME` empty uses SQLite for local checks.
 
 ### Frontend
 
@@ -68,5 +72,20 @@ Protected routes enforce roles in the client for navigation, while the backend e
 - `/forgot-password` (UI placeholder until email delivery is added)
 - `/profile`
 - `/citizen/dashboard`, `/officer/dashboard`, `/admin/dashboard`
+- `/citizen/requests`
+- `/citizen/requests/new`
+- `/citizen/requests/:id`
+
+## Module 2 API
+
+All request endpoints use `Authorization: Bearer <access-token>` and operate on the authenticated citizen’s own records:
+
+- `POST /api/requests/` creates a request with `SUBMITTED` status.
+- `GET /api/requests/` lists only the authenticated citizen’s requests.
+- `GET /api/requests/<id>/` retrieves one owned request.
+- `PATCH /api/requests/<id>/` updates title, description, location, coordinates, or image while status is `SUBMITTED` or `PENDING`.
+- `DELETE /api/requests/<id>/` cancels by deleting only while status is `SUBMITTED` or `PENDING`.
+
+The backend assigns ownership from `request.user`; client-supplied `user_id` and `status` values are ignored. Request images accept JPG, JPEG, PNG, and WEBP up to 5 MB.
 
 See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for request and response details."# community_service" 
