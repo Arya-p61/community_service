@@ -34,6 +34,21 @@ class AIServiceError(RuntimeError):
     pass
 
 
+def _log_gemini_exception(exc: Exception) -> None:
+    status_code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    response = getattr(exc, "response", None)
+    if status_code is None and response is not None:
+        status_code = getattr(response, "status_code", None)
+    message = str(exc)
+    if settings.GEMINI_API_KEY:
+        message = message.replace(settings.GEMINI_API_KEY, "[REDACTED]")
+    print(f"Gemini API key loaded: {bool(settings.GEMINI_API_KEY)}", flush=True)
+    print(f"Gemini model: {settings.GEMINI_MODEL}", flush=True)
+    print(f"Gemini exception type: {type(exc).__name__}", flush=True)
+    print(f"Gemini HTTP status: {status_code}", flush=True)
+    print(f"Gemini error: {message}", flush=True)
+
+
 def _fallback_summary(description: str) -> str:
     cleaned = " ".join(description.split())
     return cleaned[:300] or "The citizen reported a community service issue."
@@ -87,7 +102,9 @@ Location: {location or "Not provided"}
 
 async def classify_request(title: str, description: str, location: str | None) -> AIClassificationResponse:
     if not settings.GEMINI_API_KEY:
-        raise AIServiceError("Gemini API key is not configured")
+        error = AIServiceError("Gemini API key is not configured")
+        _log_gemini_exception(error)
+        raise error
 
     try:
         from google import genai
@@ -106,9 +123,12 @@ async def classify_request(title: str, description: str, location: str | None) -
         if not raw_response:
             raise AIServiceError("Gemini returned an empty response")
         return validate_classification(json.loads(raw_response), description)
-    except AIServiceError:
+    except AIServiceError as exc:
+        _log_gemini_exception(exc)
         raise
     except (json.JSONDecodeError, TypeError, ValueError, OSError) as exc:
+        _log_gemini_exception(exc)
         raise AIServiceError("Gemini returned an invalid response") from exc
     except Exception as exc:
+        _log_gemini_exception(exc)
         raise AIServiceError("Gemini classification is currently unavailable") from exc

@@ -1,0 +1,10 @@
+import { useEffect, useState } from "react";
+import { getDepartments, createDepartment, updateDepartment } from "../services/requestService";
+import "../components/Workflow.css";
+
+export default function AdminDepartments() {
+  const [items, setItems] = useState([]); const [form, setForm] = useState({ name: "", code: "", description: "" }); const [error, setError] = useState("");
+  const load = () => getDepartments(true).then(setItems).catch(() => setError("Unable to load departments.")); useEffect(() => { load(); }, []);
+  const create = async (event) => { event.preventDefault(); try { await createDepartment(form); setForm({ name: "", code: "", description: "" }); load(); } catch (createError) { setError(createError.response?.data?.detail || "Unable to create department."); } };
+  return <div className="workflow-page"><div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Departments</h1><p>Manage the controlled routing destinations.</p></div></div>{error && <p className="form-error">{error}</p>}<form className="workflow-form" onSubmit={create}><label>Name<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label><label>Code<input value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} required /></label><label>Description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows="2" /></label><button className="button button-primary">Create department</button></form><div className="workflow-card"><table className="workflow-table"><thead><tr><th>Name</th><th>Code</th><th>Status</th><th>Action</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.code}</td><td>{item.is_active ? "Active" : "Inactive"}</td><td>{item.is_active && <button className="button button-ghost" onClick={() => updateDepartment(item.id, { is_active: false }).then(load)}>Deactivate</button>}</td></tr>)}</tbody></table></div></div>;
+}

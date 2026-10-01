@@ -1,0 +1,21 @@
+.workflow-toolbar { display: flex; gap: 12px; margin: 32px 0 24px; flex-wrap: wrap; }
+.workflow-toolbar input, .workflow-toolbar select, .workflow-form input, .workflow-form select, .workflow-form textarea { border: 1px solid var(--line); border-radius: 8px; background: white; padding: 12px 13px; color: var(--ink); }
+.workflow-toolbar input { flex: 1; min-width: 220px; }
+.workflow-table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.workflow-table th, .workflow-table td { padding: 15px 17px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
+.workflow-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.workflow-table tr:last-child td { border-bottom: 0; }
+.workflow-table a { color: var(--green); font-weight: 700; }
+.workflow-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 38px 0; }
+.workflow-stat { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
+.workflow-stat span { color: var(--muted); font-size: 12px; }
+.workflow-stat strong { display: block; margin-top: 10px; font: 600 32px Fraunces, serif; }
+.workflow-card { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 24px; margin-top: 18px; }
+.workflow-card h2 { margin-top: 0; }
+.workflow-form { display: grid; gap: 14px; max-width: 560px; margin-top: 28px; }
+.workflow-form label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.workflow-note { display: flex; justify-content: space-between; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.workflow-note:last-child { border-bottom: 0; }
+.workflow-muted { color: var(--muted); }
+.workflow-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+@media (max-width: 760px) { .workflow-grid { grid-template-columns: 1fr 1fr; } .workflow-table { display: block; overflow-x: auto; } }

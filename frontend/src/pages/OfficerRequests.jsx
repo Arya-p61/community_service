@@ -1,0 +1,13 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { getOfficerRequests } from "../services/requestService";
+import RequestStatus from "../components/RequestStatus";
+import "../components/Workflow.css";
+
+export default function OfficerRequests() {
+  const [items, setItems] = useState([]); const [filters, setFilters] = useState({ search: "", status: "", priority: "", assigned: "" }); const [error, setError] = useState("");
+  const load = () => getOfficerRequests(Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ""))).then(setItems).catch(() => setError("Unable to load the department queue."));
+  useEffect(() => { load(); }, [filters.status, filters.priority, filters.assigned]);
+  const search = (event) => { event.preventDefault(); load(); };
+  return <div className="workflow-page"><div className="page-heading"><div><p className="eyebrow">Operations</p><h1>Request queue</h1><p>Requests routed to your department.</p></div></div><form className="workflow-toolbar" onSubmit={search}><input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Search requests" /><select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All statuses</option><option>SUBMITTED</option><option>PENDING</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select><select value={filters.priority} onChange={(event) => setFilters({ ...filters, priority: event.target.value })}><option value="">All priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select><select value={filters.assigned} onChange={(event) => setFilters({ ...filters, assigned: event.target.value })}><option value="">Everyone</option><option value="false">Unassigned</option><option value="true">Assigned</option></select><button className="button button-primary">Search</button></form>{error && <p className="form-error">{error}</p>}{items.length === 0 ? <div className="request-feedback">No requests match these filters.</div> : <table className="workflow-table"><thead><tr><th>Request</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned officer</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><Link to={`/officer/requests/${item.id}`}>{item.title}</Link><br /><span className="workflow-muted">REQ-{String(item.id).padStart(3, "0")}</span></td><td>{item.category || "Awaiting AI"}</td><td>{item.priority || "-"}</td><td><RequestStatus status={item.status} /></td><td>{item.assigned_officer_name || "Unassigned"}</td></tr>)}</tbody></table>}</div>;
+}

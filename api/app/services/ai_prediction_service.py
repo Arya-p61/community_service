@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.core.database import SessionLocal
 from app.models.ai_prediction import AIPrediction, AIProcessingStatus
 from app.models.service_request import ServiceRequest
+from app.models.department import Department
 from app.services.ai_service import (
     DEPARTMENT_BY_CATEGORY,
     FALLBACK_ACTION,
@@ -49,6 +51,11 @@ async def classify_and_store(db: Session, service_request: ServiceRequest) -> AI
         model="gemini",
         processing_status=processing_status,
     )
+    if processing_status == AIProcessingStatus.COMPLETED:
+        department_name = DEPARTMENT_BY_CATEGORY[classification.category]
+        department = db.scalar(select(Department).where(Department.name == department_name))
+        if department is not None and department.is_active:
+            service_request.department_id = department.id
     db.add(prediction)
     db.commit()
     db.refresh(prediction)

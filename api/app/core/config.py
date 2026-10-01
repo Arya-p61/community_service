@@ -18,7 +18,7 @@ class Settings:
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
     )
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
     @property
     def database_url(self) -> str:

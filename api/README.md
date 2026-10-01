@@ -63,4 +63,32 @@ GET  /api/service-requests/{request_id}/classification
 
 `POST` creates a new prediction rather than overwriting history. `GET` returns the latest prediction, including `PENDING`, `COMPLETED`, or `FAILED` processing status.
 
-Images are not sent to Gemini. Image analysis, duplicate detection, department assignment workflows, notifications, and officer tooling are intentionally outside this module.
+Images are not sent to Gemini. Image analysis, duplicate detection, notifications, and advanced analytics are intentionally outside this module.
+
+## Module 4 workflow
+
+Startup creates the `departments`, `request_status_history`, and `request_notes` tables and safely adds the nullable `department_id` and `assigned_officer_id` columns to existing tables. The seven default departments are seeded idempotently.
+
+Department and officer endpoints use the existing JWT roles:
+
+```text
+GET    /api/departments
+POST   /api/departments                 (admin)
+PATCH  /api/departments/{id}            (admin)
+DELETE /api/departments/{id}            (admin, deactivates)
+GET    /api/admin/officers              (admin)
+POST   /api/admin/officers              (admin)
+PATCH  /api/admin/officers/{id}         (admin)
+GET    /api/officer/requests            (officer)
+GET    /api/officer/requests/{id}       (officer)
+POST   /api/officer/requests/{id}/claim (officer)
+POST   /api/officer/requests/{id}/unclaim (officer)
+PATCH  /api/officer/requests/{id}/status (officer)
+POST   /api/officer/requests/{id}/notes (officer)
+GET    /api/officer/requests/{id}/notes (officer)
+GET    /api/admin/requests              (admin)
+PATCH  /api/admin/requests/{id}/assignment (admin)
+PATCH  /api/admin/requests/{id}/status  (admin)
+```
+
+Successful AI classifications route a request through the existing controlled category mapping. Officers can only see their department, claim unassigned requests, update assigned request status through valid transitions, and view internal notes. Citizens never receive internal notes. Admins bypass department restrictions but cannot assign an officer to a different department.

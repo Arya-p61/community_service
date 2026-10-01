@@ -33,5 +33,9 @@ class ServiceRequestResponse(BaseModel):
     longitude: float | None
     image: str | None
     status: ServiceRequestStatus
+    department_id: int | None = None
+    department_name: str | None = None
+    assigned_officer_id: int | None = None
+    assigned_officer_name: str | None = None
     created_at: datetime
     updated_at: datetime

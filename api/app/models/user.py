@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, Enum as SqlEnum, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Enum as SqlEnum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -24,6 +24,7 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(
         SqlEnum(UserRole, name="user_role"), default=UserRole.CITIZEN, nullable=False
     )
+    department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True, index=True)
     profile_image: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -33,5 +34,15 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     service_requests: Mapped[list["ServiceRequest"]] = relationship(
-        "ServiceRequest", back_populates="user", cascade="all, delete-orphan"
+        "ServiceRequest", foreign_keys="ServiceRequest.user_id", back_populates="user", cascade="all, delete-orphan"
     )
+    department: Mapped["Department | None"] = relationship("Department", back_populates="officers")
+    assigned_requests: Mapped[list["ServiceRequest"]] = relationship(
+        "ServiceRequest", foreign_keys="ServiceRequest.assigned_officer_id", back_populates="assigned_officer"
+    )
+    status_changes: Mapped[list["RequestStatusHistory"]] = relationship("RequestStatusHistory", back_populates="changer")
+    request_notes: Mapped[list["RequestNote"]] = relationship("RequestNote", back_populates="officer")
+
+    @property
+    def department_name(self) -> str | None:
+        return self.department.name if self.department else None
