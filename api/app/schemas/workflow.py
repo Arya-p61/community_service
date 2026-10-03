@@ -59,7 +59,7 @@ class StatusHistoryResponse(BaseModel):
 
     id: int
     service_request_id: int
-    old_status: str
+    old_status: str | None
     new_status: str
     changed_by: int
     note: str | None

@@ -73,7 +73,7 @@ def _department_request(db: Session, request_id: int, current_user: User, assign
     if current_user.role == UserRole.ADMIN:
         return service_request
     if current_user.department_id is None or service_request.department_id != current_user.department_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service request not found")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Request belongs to another department")
     if assigned_only and service_request.assigned_officer_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Request is assigned to another officer")
     return service_request
@@ -175,6 +175,8 @@ def update_request_status(request_id: int, payload: StatusUpdate, officer: User 
     allowed = STATUS_TRANSITIONS.get(service_request.status, set())
     if payload.status not in allowed:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+    if payload.status in {ServiceRequestStatus.RESOLVED, ServiceRequestStatus.CLOSED} and not payload.note:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A resolution note is required")
     _record_status(db, service_request, service_request.status, payload.status, officer.id, payload.note)
     db.commit(); db.refresh(service_request)
     return _request_response(db, service_request)
@@ -183,6 +185,8 @@ def update_request_status(request_id: int, payload: StatusUpdate, officer: User 
 @router.post("/api/officer/requests/{request_id}/notes", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
 def add_note(request_id: int, payload: NoteCreate, officer: User = Depends(require_officer), db: Session = Depends(get_db)) -> RequestNote:
     service_request = _department_request(db, request_id, officer, assigned_only=True)
+    if service_request.status == ServiceRequestStatus.CLOSED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Closed requests cannot receive new notes")
     note = RequestNote(service_request_id=service_request.id, officer_id=officer.id, note=payload.note)
     db.add(note); db.commit(); db.refresh(note)
     return note
@@ -243,6 +247,15 @@ def admin_notes(request_id: int, _: User = Depends(require_admin), db: Session =
     if db.get(ServiceRequest, request_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service request not found")
     return list(db.scalars(select(RequestNote).where(RequestNote.service_request_id == request_id).order_by(RequestNote.created_at)).all())
+
+
+@router.post("/api/admin/requests/{request_id}/notes", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
+def add_admin_note(request_id: int, payload: NoteCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> RequestNote:
+    if db.get(ServiceRequest, request_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service request not found")
+    note = RequestNote(service_request_id=request_id, officer_id=admin.id, note=payload.note)
+    db.add(note); db.commit(); db.refresh(note)
+    return note
 
 
 @router.get("/api/admin/requests/{request_id}/history", response_model=list[StatusHistoryResponse])

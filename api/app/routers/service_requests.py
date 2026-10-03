@@ -9,13 +9,15 @@ from starlette.datastructures import UploadFile
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.service_request import ServiceRequest, ServiceRequestStatus
-from app.models.user import User
+from app.models.request_status_history import RequestStatusHistory
+from app.models.user import User, UserRole
 from app.services.ai_prediction_service import classify_in_background, pending_prediction
 from app.schemas.service_request import (
     ServiceRequestCreate,
     ServiceRequestResponse,
     ServiceRequestUpdate,
 )
+from app.schemas.workflow import StatusHistoryResponse
 
 router = APIRouter(prefix="/api/service-requests", tags=["Service Requests"])
 MEDIA_DIR = Path(__file__).resolve().parents[2] / "media" / "requests"
@@ -107,6 +109,13 @@ async def create_service_request(
     db.add(service_request)
     db.commit()
     db.refresh(service_request)
+    db.add(RequestStatusHistory(
+        service_request_id=service_request.id,
+        old_status="NONE",
+        new_status=ServiceRequestStatus.SUBMITTED.value,
+        changed_by=current_user.id,
+        note="Request submitted by citizen",
+    ))
     db.add(pending_prediction(service_request.id))
     db.commit()
     background_tasks.add_task(classify_in_background, service_request.id)
@@ -142,6 +151,35 @@ def get_service_request(
     db: Session = Depends(get_db),
 ) -> ServiceRequest:
     return _owned_request(db, request_id, current_user.id)
+
+
+@router.get("/{request_id}/history", response_model=list[StatusHistoryResponse])
+@router.get("/{request_id}/status-history", response_model=list[StatusHistoryResponse])
+def get_request_history(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[RequestStatusHistory]:
+    service_request = db.get(ServiceRequest, request_id)
+    if service_request is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service request not found")
+    if current_user.role == UserRole.CITIZEN and service_request.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service request not found")
+    if current_user.role == UserRole.OFFICER and service_request.department_id != current_user.department_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Request belongs to another department")
+    history = db.scalars(select(RequestStatusHistory).where(RequestStatusHistory.service_request_id == service_request.id).order_by(RequestStatusHistory.created_at)).all()
+    return [
+        StatusHistoryResponse(
+            id=item.id,
+            service_request_id=item.service_request_id,
+            old_status=None if item.old_status == "NONE" else item.old_status,
+            new_status=item.new_status,
+            changed_by=item.changed_by,
+            note=item.note,
+            created_at=item.created_at,
+        )
+        for item in history
+    ]
 
 
 @router.patch("/{request_id}", response_model=ServiceRequestResponse)

@@ -54,9 +54,13 @@ export async function unclaimOfficerRequest(id) {
   return data;
 }
 
-export async function updateOfficerStatus(id, payload) {
-  const { data } = await api.patch(`/officer/requests/${id}/status`, payload);
+export async function updateRequestStatus(requestId, status, note) {
+  const { data } = await api.patch(`/officer/requests/${requestId}/status`, { status, note });
   return data;
+}
+
+export async function updateOfficerStatus(id, payload) {
+  return updateRequestStatus(id, payload.status, payload.note);
 }
 
 export async function addOfficerNote(id, note) {
@@ -66,6 +70,11 @@ export async function addOfficerNote(id, note) {
 
 export async function getOfficerNotes(id) {
   const { data } = await api.get(`/officer/requests/${id}/notes`);
+  return data;
+}
+
+export async function getOfficerHistory(id) {
+  const { data } = await api.get(`/officer/requests/${id}/history`);
   return data;
 }
 
@@ -97,4 +106,28 @@ export async function createOfficer(payload) {
 export async function updateOfficer(id, payload) {
   const { data } = await api.patch(`/admin/officers/${id}`, payload);
   return data;
+}
+
+export async function getAdminRequests() {
+  const { data } = await api.get("/admin/requests");
+  return data;
+}
+
+export async function updateAdminAssignment(id, payload) {
+  const { data } = await api.patch(`/admin/requests/${id}/assignment`, payload);
+  return data;
+}
+
+export async function updateAdminStatus(id, payload) {
+  const { data } = await api.patch(`/admin/requests/${id}/status`, payload);
+  return data;
+}
+
+export async function getRequestStatusHistory(requestId) {
+  const { data } = await api.get(`/service-requests/${requestId}/status-history`);
+  return data;
+}
+
+export async function getRequestHistory(id) {
+  return getRequestStatusHistory(id);
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import RequestStatus from "../components/RequestStatus";
+import RequestStatusTimeline from "../components/RequestStatusTimeline";
 import "../components/AIClassification.css";
-import { classifyRequest, deleteRequest, getClassification, getRequestById, updateRequest } from "../services/requestService";
+import { classifyRequest, deleteRequest, getClassification, getRequestById, getRequestStatusHistory, updateRequest } from "../services/requestService";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -17,6 +18,9 @@ export default function RequestDetail() {
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [classification, setClassification] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -38,6 +42,14 @@ export default function RequestDetail() {
           if (active) setClassification(result);
         } catch (classificationError) {
           if (active && classificationError.response?.status !== 404) setAiError("Unable to load the AI analysis.");
+        }
+        try {
+          const requestHistory = await getRequestStatusHistory(id);
+          if (active) setHistory(requestHistory);
+        } catch {
+          if (active) { setHistory([]); setHistoryError("Unable to load status history."); }
+        } finally {
+          if (active) setHistoryLoading(false);
         }
       } catch {
         if (active) setError("This request could not be found or is not available to your account.");
@@ -80,6 +92,7 @@ export default function RequestDetail() {
     <div className="detail-header"><div><span className="request-id">REQ-{String(request.id).padStart(3, "0")}</span><h1>{request.title}</h1><div className="detail-location">&#8981; {request.location || "Location not provided"}</div></div><RequestStatus status={request.status} /></div>
     <div className="detail-layout"><article className="detail-card">{editing ? <form className="form-stack" onSubmit={save}><Field label="Issue title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} /><label className="field"><span>Description</span><textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows="6" required /></label><Field label="Location" value={form.location || ""} onChange={(value) => setForm({ ...form, location: value })} /><div className="form-grid"><Field label="Latitude" value={form.latitude || ""} onChange={(value) => setForm({ ...form, latitude: value })} /><Field label="Longitude" value={form.longitude || ""} onChange={(value) => setForm({ ...form, longitude: value })} /></div><label className="field"><span>Replace image</span><input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={selectImage} /></label>{imagePreview && <img src={imagePreview} alt="Request evidence preview" style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: 8 }} />}<div className="detail-actions"><button className="button button-primary" disabled={busy}>Save changes</button><button type="button" className="button button-ghost" onClick={() => setEditing(false)}>Discard</button></div></form> : <><p className="detail-description">{request.description}</p>{request.image && <img className="request-image" src={mediaUrl(request.image)} alt="Attached evidence" />}<div className="detail-meta"><div><span>Location</span><strong>{request.location || "Not provided"}</strong></div><div><span>Coordinates</span><strong>{request.latitude != null && request.longitude != null ? `${request.latitude}, ${request.longitude}` : "Not provided"}</strong></div><div><span>Submitted</span><strong>{dateLabel(request.created_at)}</strong></div><div><span>Last updated</span><strong>{dateLabel(request.updated_at)}</strong></div></div>{editable && <div className="detail-actions"><button className="button button-primary" onClick={beginEdit}>Edit request</button><button className="button button-danger" onClick={cancel} disabled={busy}>Cancel request</button></div>}</>}</article></div>
     <div className="workflow-card citizen-routing"><strong>Department:</strong> {request.department_name || "Awaiting routing"} <span className="workflow-muted">| Assigned officer: {request.assigned_officer_name || "Not assigned yet"}</span></div>
+    <RequestStatusTimeline history={history} currentStatus={request.status} loading={historyLoading} error={historyError} />
     <AIClassification classification={classification} loading={aiLoading} busy={aiBusy} error={aiError} onAnalyze={analyze} />
   </div>;
 }
