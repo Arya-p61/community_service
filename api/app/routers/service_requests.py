@@ -6,6 +6,9 @@ from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 from starlette.datastructures import UploadFile
 
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
+
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.service_request import ServiceRequest, ServiceRequestStatus
@@ -47,15 +50,18 @@ def _owned_request(db: Session, request_id: int, user_id: int) -> ServiceRequest
 
 
 async def _parse_payload(request: Request, schema: type[ServiceRequestCreate | ServiceRequestUpdate]):
-    content_type = request.headers.get("content-type", "")
-    if content_type.startswith("multipart/form-data"):
-        form = await request.form()
-        values = dict(form)
-        image = values.pop("image", None)
-        values = {key: (None if value == "" else value) for key, value in values.items()}
-        return schema.model_validate(values), image if isinstance(image, UploadFile) else None
+    try:
+        content_type = request.headers.get("content-type", "")
+        if content_type.startswith("multipart/form-data"):
+            form = await request.form()
+            values = dict(form)
+            image = values.pop("image", None)
+            values = {key: (None if value == "" else value) for key, value in values.items()}
+            return schema.model_validate(values), image if isinstance(image, UploadFile) else None
 
-    return schema.model_validate(await request.json()), None
+        return schema.model_validate(await request.json()), None
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors())
 
 
 async def _save_image(image: UploadFile | None) -> str | None:

@@ -8,6 +8,8 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import { Icon } from "../components/ui/Icons";
 
+import RequestsMapView from "../components/map/RequestsMapView";
+
 const formatDate = (date) =>
   new Date(date).toLocaleDateString(undefined, {
     day: "numeric",
@@ -18,6 +20,7 @@ const formatDate = (date) =>
 export default function OfficerRequests() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
+  const [viewMode, setViewMode] = useState("list"); // 'list' | 'map'
   const [filters, setFilters] = useState({
     search: "",
     status: "",
@@ -66,6 +69,28 @@ export default function OfficerRequests() {
         eyebrow={`${user?.department_name || "Department"} Operations`}
         title="Department Request Queue"
         description="Review community reports assigned to your department, claim work, and update service progress."
+        actions={
+          <div className="cg-view-toggle">
+            <button
+              type="button"
+              className={`cg-view-toggle-btn ${viewMode === "list" ? "active" : ""}`}
+              onClick={() => setViewMode("list")}
+              title="Table Queue View"
+            >
+              <Icon name="requests" size={14} />
+              <span>List</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-view-toggle-btn ${viewMode === "map" ? "active" : ""}`}
+              onClick={() => setViewMode("map")}
+              title="Department Map View"
+            >
+              <Icon name="location" size={14} />
+              <span>Map</span>
+            </button>
+          </div>
+        }
       />
 
       {/* Filter and Search Bar */}
@@ -170,6 +195,13 @@ export default function OfficerRequests() {
             </Button>
           )}
         </div>
+      ) : viewMode === "map" ? (
+        <RequestsMapView
+          requests={items}
+          detailBasePath="/officer/requests"
+          role="officer"
+          emptyMessage="No requests in your department queue have GPS coordinates matching the filters."
+        />
       ) : (
         <div className="cg-table-card">
           <div className="cg-table-responsive">

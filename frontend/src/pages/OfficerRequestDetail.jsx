@@ -7,6 +7,7 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Modal from "../components/ui/Modal";
 import { Icon } from "../components/ui/Icons";
+import RequestLocationPreview from "../components/map/RequestLocationPreview";
 import {
   addOfficerNote,
   claimOfficerRequest,
@@ -162,12 +163,13 @@ export default function OfficerRequestDetail() {
   const assignedToMe = request.assigned_officer_id === user?.id;
   const isUnassigned = !request.assigned_officer_id;
   const assignedToOther = request.assigned_officer_id && !assignedToMe;
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="cg-officer-detail-page">
       <PageHeader
-        backTo="/officer/requests"
-        backLabel="Back to Department Queue"
+        backTo={isAdmin ? "/admin/requests" : "/officer/requests"}
+        backLabel={isAdmin ? "Back to All Requests" : "Back to Department Queue"}
         eyebrow={`REQ-${String(request.id).padStart(3, "0")} • ${request.department_name || "Department"}`}
         title={request.title}
         description={request.location ? `Location: ${request.location}` : "Department workflow record"}
@@ -332,6 +334,21 @@ export default function OfficerRequestDetail() {
                 <strong>{formatDate(request.updated_at || request.created_at)}</strong>
               </div>
             </div>
+
+            {request.latitude != null && request.longitude != null && (
+              <div style={{ marginTop: "18px", paddingTop: "18px", borderTop: "1px solid var(--cg-border-light)" }}>
+                <span className="cg-text-muted" style={{ display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: 600, textTransform: "uppercase" }}>
+                  Issue Geographic Pin
+                </span>
+                <RequestLocationPreview
+                  latitude={request.latitude}
+                  longitude={request.longitude}
+                  location={request.location}
+                  status={request.status}
+                  title={request.title}
+                />
+              </div>
+            )}
           </Card>
 
           {/* Internal Notes (Officer Only) */}

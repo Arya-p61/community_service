@@ -8,6 +8,8 @@ import Card from "../components/ui/Card";
 import Modal from "../components/ui/Modal";
 import StarRating from "../components/ui/StarRating";
 import { Icon } from "../components/ui/Icons";
+import RequestLocationPreview from "../components/map/RequestLocationPreview";
+import LocationPickerMap from "../components/map/LocationPickerMap";
 import {
   classifyRequest,
   deleteRequest,
@@ -145,9 +147,25 @@ export default function RequestDetail() {
     setBusy(true);
     setError("");
 
+    if (form.latitude !== "" && form.latitude !== null && form.latitude !== undefined) {
+      const latNum = parseFloat(form.latitude);
+      if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+        setBusy(false);
+        return setError("Latitude must be a valid number between -90 and 90 degrees.");
+      }
+    }
+
+    if (form.longitude !== "" && form.longitude !== null && form.longitude !== undefined) {
+      const lngNum = parseFloat(form.longitude);
+      if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+        setBusy(false);
+        return setError("Longitude must be a valid number between -180 and 180 degrees.");
+      }
+    }
+
     const payload = new FormData();
     ["title", "description", "location", "latitude", "longitude"].forEach((k) => {
-      if (form[k] !== undefined && form[k] !== null) payload.append(k, form[k]);
+      if (form[k] !== undefined && form[k] !== null && form[k] !== "") payload.append(k, form[k]);
     });
     if (image) payload.append("image", image);
 
@@ -383,6 +401,21 @@ export default function RequestDetail() {
                 <strong>{formatDate(request.updated_at || request.created_at)}</strong>
               </div>
             </div>
+
+            {request.latitude != null && request.longitude != null && (
+              <div style={{ marginTop: "18px", paddingTop: "18px", borderTop: "1px solid var(--cg-border-light)" }}>
+                <span className="cg-text-muted" style={{ display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: 600, textTransform: "uppercase" }}>
+                  Issue Geographic Pin
+                </span>
+                <RequestLocationPreview
+                  latitude={request.latitude}
+                  longitude={request.longitude}
+                  location={request.location}
+                  status={request.status}
+                  title={request.title}
+                />
+              </div>
+            )}
           </Card>
 
           {/* Status Progression and History */}
@@ -720,13 +753,25 @@ export default function RequestDetail() {
           </div>
 
           <div className="cg-form-field">
-            <label className="cg-field-label" htmlFor="edit-location">Location</label>
+            <label className="cg-field-label" htmlFor="edit-location">Street Address / Landmark</label>
             <input
               id="edit-location"
               type="text"
               className="cg-input"
               value={form.location || ""}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
+          </div>
+
+          <div style={{ marginTop: "8px", marginBottom: "8px" }}>
+            <LocationPickerMap
+              latitude={form.latitude}
+              longitude={form.longitude}
+              onLocationChange={(lat, lng) => setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }))}
+              onAddressDetected={(detected) => {
+                if (!form.location) setForm((prev) => ({ ...prev, location: detected }));
+              }}
+              addressValue={form.location}
             />
           </div>
 

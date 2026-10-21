@@ -13,6 +13,7 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Modal from "../components/ui/Modal";
 import { Icon } from "../components/ui/Icons";
+import RequestsMapView from "../components/map/RequestsMapView";
 
 const STATUSES = ["SUBMITTED", "PENDING", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 
@@ -21,6 +22,7 @@ export default function AdminRequests() {
   const [departments, setDepartments] = useState([]);
   const [officers, setOfficers] = useState([]);
   const [filters, setFilters] = useState({ search: "", status: "", departmentId: "" });
+  const [viewMode, setViewMode] = useState("list"); // 'list' | 'map'
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -141,6 +143,28 @@ export default function AdminRequests() {
         eyebrow="Administration Console"
         title="All Service Requests"
         description="Global governance of municipal requests: assign departments, designate officers, and override workflow states."
+        actions={
+          <div className="cg-view-toggle">
+            <button
+              type="button"
+              className={`cg-view-toggle-btn ${viewMode === "list" ? "active" : ""}`}
+              onClick={() => setViewMode("list")}
+              title="Table View"
+            >
+              <Icon name="requests" size={14} />
+              <span>List</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-view-toggle-btn ${viewMode === "map" ? "active" : ""}`}
+              onClick={() => setViewMode("map")}
+              title="Global Map View"
+            >
+              <Icon name="location" size={14} />
+              <span>Map</span>
+            </button>
+          </div>
+        }
       />
 
       {error && (
@@ -253,6 +277,13 @@ export default function AdminRequests() {
             </Button>
           )}
         </div>
+      ) : viewMode === "map" ? (
+        <RequestsMapView
+          requests={visible}
+          detailBasePath="/admin/requests"
+          role="admin"
+          emptyMessage="No service requests match the selected filters or have GPS coordinates."
+        />
       ) : (
         <div className="cg-table-card">
           <div className="cg-table-responsive">

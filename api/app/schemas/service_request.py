@@ -9,16 +9,16 @@ class ServiceRequestCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1)
     location: str | None = Field(default=None, max_length=255)
-    latitude: float | None = None
-    longitude: float | None = None
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
 
 
 class ServiceRequestUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, min_length=1)
     location: str | None = Field(default=None, max_length=255)
-    latitude: float | None = None
-    longitude: float | None = None
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
 
 
 class ServiceRequestResponse(BaseModel):
@@ -37,5 +37,7 @@ class ServiceRequestResponse(BaseModel):
     department_name: str | None = None
     assigned_officer_id: int | None = None
     assigned_officer_name: str | None = None
+    category: str | None = None
+    priority: str | None = None
     created_at: datetime
     updated_at: datetime

@@ -6,6 +6,8 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import { Icon } from "../components/ui/Icons";
 
+import LocationPickerMap from "../components/map/LocationPickerMap";
+
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -20,7 +22,6 @@ export default function NewRequest() {
   });
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
-  const [locating, setLocating] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -58,28 +59,23 @@ export default function NewRequest() {
     setImagePreview("");
   };
 
-  const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setError("Location capture is not supported by your browser.");
-      return;
-    }
-    setLocating(true);
+  const handleLocationChange = (lat, lng) => {
     setError("");
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setForm((prev) => ({
-          ...prev,
-          latitude: coords.latitude.toFixed(6),
-          longitude: coords.longitude.toFixed(6),
-        }));
-        setLocating(false);
-      },
-      (err) => {
-        setError(`Unable to retrieve GPS coordinates: ${err.message}. You can enter them manually.`);
-        setLocating(false);
-      },
-      { timeout: 10000, enableHighAccuracy: true }
-    );
+    setForm((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng,
+    }));
+  };
+
+  const handleAddressDetected = (detectedAddress, isAuto) => {
+    if (isAuto) {
+      // Auto-fill only if address field is currently empty
+      setForm((prev) => (prev.location ? prev : { ...prev, location: detectedAddress }));
+    } else {
+      // User explicitly clicked "Use this address"
+      setForm((prev) => ({ ...prev, location: detectedAddress }));
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -93,9 +89,24 @@ export default function NewRequest() {
       return setError("Please provide a description of the issue.");
     }
 
+    // Coordinate range validations
+    if (form.latitude !== "" && form.latitude !== null && form.latitude !== undefined) {
+      const latNum = parseFloat(form.latitude);
+      if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+        return setError("Latitude must be a valid number between -90 and 90 degrees.");
+      }
+    }
+
+    if (form.longitude !== "" && form.longitude !== null && form.longitude !== undefined) {
+      const lngNum = parseFloat(form.longitude);
+      if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+        return setError("Longitude must be a valid number between -180 and 180 degrees.");
+      }
+    }
+
     const payload = new FormData();
     Object.entries(form).forEach(([key, value]) => {
-      if (value !== "" && value !== null) {
+      if (value !== "" && value !== null && value !== undefined) {
         payload.append(key, value);
       }
     });
@@ -191,53 +202,49 @@ export default function NewRequest() {
                 </div>
               </div>
 
-              {/* Coordinates */}
-              <div style={{ borderTop: "1px solid var(--cg-border-light)", paddingTop: "18px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                  <div>
-                    <h4 style={{ fontSize: "14px", fontWeight: 600 }}>GPS Coordinates <span style={{ fontWeight: 400, color: "var(--cg-text-muted)" }}>(Optional)</span></h4>
-                    <p style={{ fontSize: "12px", color: "var(--cg-text-secondary)" }}>Helps field inspection teams locate the exact spot</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleGetCurrentLocation}
-                    loading={locating}
-                    icon={<Icon name="target" size={14} />}
-                  >
-                    Use GPS Location
-                  </Button>
-                </div>
+                {/* Interactive Map & Coordinates */}
+                <div style={{ borderTop: "1px solid var(--cg-border-light)", paddingTop: "18px" }}>
+                  <LocationPickerMap
+                    latitude={form.latitude}
+                    longitude={form.longitude}
+                    onLocationChange={handleLocationChange}
+                    onAddressDetected={handleAddressDetected}
+                    addressValue={form.location}
+                  />
 
-                <div className="cg-form-row">
-                  <div className="cg-form-field">
-                    <label className="cg-field-label" htmlFor="latitude">Latitude</label>
-                    <input
-                      id="latitude"
-                      type="number"
-                      step="any"
-                      className="cg-input"
-                      value={form.latitude}
-                      onChange={setField("latitude")}
-                      placeholder="e.g. 12.971598"
-                    />
-                  </div>
-                  <div className="cg-form-field">
-                    <label className="cg-field-label" htmlFor="longitude">Longitude</label>
-                    <input
-                      id="longitude"
-                      type="number"
-                      step="any"
-                      className="cg-input"
-                      value={form.longitude}
-                      onChange={setField("longitude")}
-                      placeholder="e.g. 77.594562"
-                    />
+                  {/* Manual Coordinate Inputs */}
+                  <div className="cg-form-row" style={{ marginTop: "14px" }}>
+                    <div className="cg-form-field">
+                      <label className="cg-field-label" htmlFor="latitude">
+                        Latitude <span className="cg-field-hint">(-90 to 90)</span>
+                      </label>
+                      <input
+                        id="latitude"
+                        type="number"
+                        step="any"
+                        className="cg-input"
+                        value={form.latitude}
+                        onChange={setField("latitude")}
+                        placeholder="e.g. 12.971598"
+                      />
+                    </div>
+                    <div className="cg-form-field">
+                      <label className="cg-field-label" htmlFor="longitude">
+                        Longitude <span className="cg-field-hint">(-180 to 180)</span>
+                      </label>
+                      <input
+                        id="longitude"
+                        type="number"
+                        step="any"
+                        className="cg-input"
+                        value={form.longitude}
+                        onChange={setField("longitude")}
+                        placeholder="e.g. 77.594562"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
           </Card>
 
           {/* Sidebar: Photo Evidence & Submission Guidance */}

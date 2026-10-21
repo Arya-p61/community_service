@@ -66,3 +66,19 @@ class ServiceRequest(Base):
     @property
     def assigned_officer_name(self) -> str | None:
         return self.assigned_officer.name if self.assigned_officer else None
+
+    @property
+    def category(self) -> str | None:
+        if self.ai_predictions:
+            for pred in reversed(self.ai_predictions):
+                if pred.category:
+                    return pred.category
+        return None
+
+    @property
+    def priority(self) -> str | None:
+        if self.ai_predictions:
+            for pred in reversed(self.ai_predictions):
+                if pred.priority:
+                    return pred.priority
+        return None

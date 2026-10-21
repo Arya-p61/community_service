@@ -6,6 +6,7 @@ import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import { Icon } from "../components/ui/Icons";
+import RequestsMapView from "../components/map/RequestsMapView";
 
 const formatDate = (date) =>
   new Date(date).toLocaleDateString(undefined, {
@@ -18,6 +19,7 @@ export default function RequestList() {
   const [requests, setRequests] = useState([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
+  const [viewMode, setViewMode] = useState("list"); // 'list' | 'map'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -55,10 +57,33 @@ export default function RequestList() {
         title="My Service Requests"
         description="Track all community issues and civic improvements you have submitted."
         actions={
-          <Link to="/citizen/requests/new" className="cg-btn cg-btn-primary cg-btn-md">
-            <Icon name="plus" size={17} />
-            <span>Report an Issue</span>
-          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div className="cg-view-toggle">
+              <button
+                type="button"
+                className={`cg-view-toggle-btn ${viewMode === "list" ? "active" : ""}`}
+                onClick={() => setViewMode("list")}
+                title="Table List View"
+              >
+                <Icon name="requests" size={14} />
+                <span>List</span>
+              </button>
+              <button
+                type="button"
+                className={`cg-view-toggle-btn ${viewMode === "map" ? "active" : ""}`}
+                onClick={() => setViewMode("map")}
+                title="Interactive Map View"
+              >
+                <Icon name="location" size={14} />
+                <span>Map</span>
+              </button>
+            </div>
+
+            <Link to="/citizen/requests/new" className="cg-btn cg-btn-primary cg-btn-md">
+              <Icon name="plus" size={17} />
+              <span>Report an Issue</span>
+            </Link>
+          </div>
         }
       />
 
@@ -158,6 +183,13 @@ export default function RequestList() {
             Clear all filters
           </Button>
         </div>
+      ) : viewMode === "map" ? (
+        <RequestsMapView
+          requests={filtered}
+          detailBasePath="/citizen/requests"
+          role="citizen"
+          emptyMessage="None of your matching requests have GPS coordinates. Switch to List view to inspect all requests."
+        />
       ) : (
         <div className="cg-table-card">
           <div className="cg-table-responsive">
