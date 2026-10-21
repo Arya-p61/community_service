@@ -251,7 +251,36 @@ export function Icon({ name, size = 18, className = "", ...props }) {
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
       );
+    case "star":
+      return (
+        <svg {...common}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+      );
+    case "star-filled":
+      return (
+        <svg {...common} fill="currentColor">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+      );
+    case "feedback":
+      return (
+        <svg {...common}>
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          <polygon points="12 7 13.09 9.74 16 10.27 14 12.14 14.45 15.02 12 13.77 9.55 15.02 10 12.14 8 10.27 10.91 9.74 12 7" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "bar-chart":
+      return (
+        <svg {...common}>
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+          <line x1="2" y1="20" x2="22" y2="20" />
+        </svg>
+      );
     default:
       return null;
   }
 }
+

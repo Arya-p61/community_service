@@ -6,14 +6,18 @@ import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Modal from "../components/ui/Modal";
+import StarRating from "../components/ui/StarRating";
 import { Icon } from "../components/ui/Icons";
 import {
   classifyRequest,
   deleteRequest,
   getClassification,
   getRequestById,
+  getRequestFeedback,
   getRequestStatusHistory,
+  submitRequestFeedback,
   updateRequest,
+  updateRequestFeedback,
 } from "../services/requestService";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -45,6 +49,16 @@ export default function RequestDetail() {
   const [imagePreview, setImagePreview] = useState("");
   const [classification, setClassification] = useState(null);
   const [history, setHistory] = useState([]);
+
+  // Feedback state
+  const [feedback, setFeedback] = useState(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(true);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackSuccess, setFeedbackSuccess] = useState("");
+  const [editFeedbackModal, setEditFeedbackModal] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -84,6 +98,18 @@ export default function RequestDetail() {
       } finally {
         setHistoryLoading(false);
       }
+
+      // Check feedback
+      try {
+        const fbData = await getRequestFeedback(id);
+        setFeedback(fbData);
+        setRating(fbData.rating);
+        setComment(fbData.comment || "");
+      } catch {
+        setFeedback(null);
+      } finally {
+        setFeedbackLoading(false);
+      }
     } catch {
       setError("This service request could not be found or is not accessible.");
     } finally {
@@ -96,6 +122,7 @@ export default function RequestDetail() {
   }, [id]);
 
   const editable = request && ["SUBMITTED", "PENDING"].includes(request.status);
+  const isEligibleForFeedback = request && ["RESOLVED", "CLOSED"].includes(request.status);
 
   const handleBeginEdit = () => {
     setImage(null);
@@ -159,6 +186,50 @@ export default function RequestDetail() {
       setAiError(err.response?.data?.detail || "AI analysis failed. Please try again.");
     } finally {
       setAiBusy(false);
+    }
+  };
+
+  const handleSubmitFeedback = async (e) => {
+    e.preventDefault();
+    setFeedbackError("");
+    setFeedbackSuccess("");
+
+    if (!rating || rating < 1 || rating > 5) {
+      return setFeedbackError("Please select a star rating from 1 to 5.");
+    }
+
+    setFeedbackBusy(true);
+    try {
+      const created = await submitRequestFeedback(id, {
+        rating,
+        comment: comment.trim() || undefined,
+      });
+      setFeedback(created);
+      setFeedbackSuccess("Thank you! Your feedback has been recorded.");
+    } catch (err) {
+      setFeedbackError(err.response?.data?.detail || "Could not submit feedback. Please try again.");
+    } finally {
+      setFeedbackBusy(false);
+    }
+  };
+
+  const handleUpdateFeedback = async (e) => {
+    e.preventDefault();
+    setFeedbackError("");
+    setFeedbackBusy(true);
+
+    try {
+      const updated = await updateRequestFeedback(id, {
+        rating,
+        comment: comment.trim() || "",
+      });
+      setFeedback(updated);
+      setEditFeedbackModal(false);
+      setFeedbackSuccess("Your feedback has been updated.");
+    } catch (err) {
+      setFeedbackError(err.response?.data?.detail || "Could not update feedback.");
+    } finally {
+      setFeedbackBusy(false);
     }
   };
 
@@ -321,6 +392,126 @@ export default function RequestDetail() {
             loading={historyLoading}
             error={historyError}
           />
+
+          {/* Module 7: Citizen Feedback & Rating Section */}
+          {isEligibleForFeedback && (
+            <Card
+              title={feedback ? "Your Community Feedback" : "How was your experience?"}
+              eyebrow="Citizen Evaluation"
+              subtitle={
+                feedback
+                  ? "Your rating helps municipal teams evaluate resolution quality"
+                  : "Help improve local services by rating the speed and quality of this resolution"
+              }
+            >
+              {feedbackSuccess && (
+                <div className="cg-form-success" style={{ marginBottom: "16px" }}>
+                  <Icon name="check-circle" size={16} />
+                  <span>{feedbackSuccess}</span>
+                </div>
+              )}
+
+              {feedbackError && (
+                <div className="cg-form-error" style={{ marginBottom: "16px" }}>
+                  <Icon name="alert-triangle" size={16} />
+                  <span>{feedbackError}</span>
+                </div>
+              )}
+
+              {feedbackLoading ? (
+                <div style={{ padding: "16px 0", color: "var(--cg-text-secondary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span className="cg-spinner cg-spinner-sm" />
+                  <span>Checking feedback status...</span>
+                </div>
+              ) : feedback ? (
+                /* Display Submitted Feedback */
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                      <StarRating value={feedback.rating} showLabel size={22} />
+                      <span className="cg-text-muted" style={{ display: "block", fontSize: "12px", marginTop: "4px" }}>
+                        Submitted on {formatDate(feedback.created_at)}
+                      </span>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={<Icon name="edit" size={13} />}
+                      onClick={() => {
+                        setRating(feedback.rating);
+                        setComment(feedback.comment || "");
+                        setFeedbackError("");
+                        setEditFeedbackModal(true);
+                      }}
+                    >
+                      Update Feedback
+                    </Button>
+                  </div>
+
+                  {feedback.comment && (
+                    <div
+                      style={{
+                        padding: "14px 16px",
+                        background: "#F8FAF7",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--cg-border)",
+                        fontSize: "14px",
+                        lineHeight: "1.6",
+                        color: "var(--cg-text-main)",
+                        marginTop: "4px",
+                      }}
+                    >
+                      "{feedback.comment}"
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Interactive Feedback Submission Form */
+                <form onSubmit={handleSubmitFeedback} className="cg-form-stack">
+                  <div className="cg-form-field">
+                    <label className="cg-field-label">
+                      Rating <span className="cg-field-required">*</span>
+                    </label>
+                    <StarRating
+                      value={rating}
+                      onChange={(r) => setRating(r)}
+                      size={28}
+                      showLabel
+                    />
+                  </div>
+
+                  <div className="cg-form-field">
+                    <label className="cg-field-label" htmlFor="feedback-comment">
+                      Additional Comments <span className="cg-field-hint">Optional (Max 1000 characters)</span>
+                    </label>
+                    <textarea
+                      id="feedback-comment"
+                      className="cg-textarea"
+                      rows={3}
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      placeholder="Share your thoughts on the timeliness, communication, or quality of the fix..."
+                      maxLength={1000}
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      loading={feedbackBusy}
+                      disabled={!rating}
+                      icon={<Icon name="check" size={15} />}
+                    >
+                      Submit Feedback
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </Card>
+          )}
         </div>
 
         {/* Sidebar: Department Routing & AI Intelligence */}
@@ -444,6 +635,57 @@ export default function RequestDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Edit Feedback Modal */}
+      <Modal
+        open={editFeedbackModal}
+        onClose={() => setEditFeedbackModal(false)}
+        title="Update Resolution Feedback"
+        subtitle={`REQ-${String(request.id).padStart(3, "0")} — ${request.title}`}
+      >
+        <form onSubmit={handleUpdateFeedback} className="cg-form-stack">
+          {feedbackError && (
+            <div className="cg-form-error">
+              <Icon name="alert-triangle" size={16} />
+              <span>{feedbackError}</span>
+            </div>
+          )}
+
+          <div className="cg-form-field">
+            <label className="cg-field-label">Your Rating</label>
+            <StarRating
+              value={rating}
+              onChange={(r) => setRating(r)}
+              size={28}
+              showLabel
+            />
+          </div>
+
+          <div className="cg-form-field">
+            <label className="cg-field-label" htmlFor="edit-fb-comment">
+              Comments (optional)
+            </label>
+            <textarea
+              id="edit-fb-comment"
+              className="cg-textarea"
+              rows={3}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Update your comments..."
+              maxLength={1000}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+            <Button variant="ghost" onClick={() => setEditFeedbackModal(false)} disabled={feedbackBusy}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={feedbackBusy} disabled={!rating}>
+              Save Feedback
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Edit Request Modal */}
       <Modal

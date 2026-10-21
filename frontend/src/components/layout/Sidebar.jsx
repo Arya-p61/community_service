@@ -20,6 +20,7 @@ const NAV = {
     { to: "/admin/requests", label: "All Requests", icon: "requests" },
     { to: "/admin/departments", label: "Departments", icon: "departments" },
     { to: "/admin/officers", label: "Officers", icon: "officers" },
+    { to: "/admin/feedback", label: "Feedback Analytics", icon: "feedback" },
     { to: "/profile", label: "Profile", icon: "profile" },
   ],
 };

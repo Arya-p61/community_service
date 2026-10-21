@@ -131,3 +131,28 @@ export async function getRequestStatusHistory(requestId) {
 export async function getRequestHistory(id) {
   return getRequestStatusHistory(id);
 }
+
+export async function submitRequestFeedback(requestId, payload) {
+  const { data } = await api.post(`/service-requests/${requestId}/feedback`, payload);
+  return data;
+}
+
+export async function getRequestFeedback(requestId) {
+  const { data } = await api.get(`/service-requests/${requestId}/feedback`);
+  return data;
+}
+
+export async function updateRequestFeedback(requestId, payload) {
+  const { data } = await api.patch(`/service-requests/${requestId}/feedback`, payload);
+  return data;
+}
+
+export async function getMyFeedback() {
+  const { data } = await api.get("/feedback/my");
+  return data;
+}
+
+export async function getAdminFeedback(params = {}) {
+  const { data } = await api.get("/admin/feedback", { params });
+  return data;
+}

@@ -55,6 +55,9 @@ class ServiceRequest(Base):
     notes: Mapped[list["RequestNote"]] = relationship(
         "RequestNote", back_populates="service_request", cascade="all, delete-orphan"
     )
+    feedback: Mapped["Feedback | None"] = relationship(
+        "Feedback", back_populates="service_request", uselist=False, cascade="all, delete-orphan"
+    )
 
     @property
     def department_name(self) -> str | None:

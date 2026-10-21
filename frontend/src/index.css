@@ -1136,6 +1136,27 @@ p {
   cursor: not-allowed;
 }
 
+.cg-select-sm {
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: var(--radius-md);
+  background: var(--cg-white);
+  border: 1px solid var(--cg-border);
+  color: var(--cg-text-main);
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  width: auto;
+}
+
+.cg-select-sm:focus {
+  border-color: var(--cg-primary-green);
+  box-shadow: 0 0 0 3px rgba(45, 106, 82, 0.12);
+}
+
+.cg-bg-subtle {
+  background-color: #F7F9F6;
+}
+
 .cg-input-with-icon {
   position: relative;
   display: flex;

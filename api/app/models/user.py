@@ -42,6 +42,7 @@ class User(Base):
     )
     status_changes: Mapped[list["RequestStatusHistory"]] = relationship("RequestStatusHistory", back_populates="changer")
     request_notes: Mapped[list["RequestNote"]] = relationship("RequestNote", back_populates="officer")
+    feedbacks: Mapped[list["Feedback"]] = relationship("Feedback", back_populates="citizen", cascade="all, delete-orphan")
 
     @property
     def department_name(self) -> str | None:

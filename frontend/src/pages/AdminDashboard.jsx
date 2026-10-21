@@ -121,7 +121,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Quick Management Section Cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "32px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", marginBottom: "32px" }}>
             <Link to="/admin/requests" style={{ textDecoration: "none" }}>
               <Card
                 title="Service Requests"
@@ -237,6 +237,46 @@ export default function AdminDashboard() {
                 </p>
                 <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "5px", color: "var(--cg-primary-green)", fontSize: "13px", fontWeight: 600 }}>
                   <span>Manage officer roster</span>
+                  <Icon name="arrow-right" size={14} />
+                </div>
+              </Card>
+            </Link>
+
+            <Link to="/admin/feedback" style={{ textDecoration: "none" }}>
+              <Card
+                title="Feedback Analytics"
+                eyebrow="Citizen Ratings"
+                className="cg-stat-link"
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+                  <div
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      borderRadius: "var(--radius-md)",
+                      background: "#FFF0F0",
+                      color: "#E57B61",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon name="star" size={20} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: "20px", color: "var(--cg-text-main)" }}>
+                      {stats.resolved}
+                    </strong>
+                    <span className="cg-text-muted" style={{ display: "block", fontSize: "12px" }}>
+                      Eligible for feedback
+                    </span>
+                  </div>
+                </div>
+                <p style={{ fontSize: "13px", color: "var(--cg-text-secondary)", lineHeight: "1.5" }}>
+                  Review citizen ratings and track department service quality over time.
+                </p>
+                <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "5px", color: "var(--cg-primary-green)", fontSize: "13px", fontWeight: 600 }}>
+                  <span>View feedback analytics</span>
                   <Icon name="arrow-right" size={14} />
                 </div>
               </Card>
