@@ -1,111 +1,581 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import RequestStatus from "../components/RequestStatus";
+import { StatusBadge, PriorityBadge } from "../components/ui/Badge";
 import RequestStatusTimeline from "../components/RequestStatusTimeline";
-import "../components/AIClassification.css";
-import { classifyRequest, deleteRequest, getClassification, getRequestById, getRequestStatusHistory, updateRequest } from "../services/requestService";
+import PageHeader from "../components/ui/PageHeader";
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Modal from "../components/ui/Modal";
+import { Icon } from "../components/ui/Icons";
+import {
+  classifyRequest,
+  deleteRequest,
+  getClassification,
+  getRequestById,
+  getRequestStatusHistory,
+  updateRequest,
+} from "../services/requestService";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const dateLabel = (date) => new Date(date).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
-const mediaUrl = (url) => url?.startsWith("http") ? url : `${(import.meta.env.VITE_API_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "")}${url}`;
+
+const formatDate = (date) => {
+  if (!date) return "Not specified";
+  return new Date(date).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+const mediaUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const base = (import.meta.env.VITE_API_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
+  return `${base}${url}`;
+};
 
 export default function RequestDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [request, setRequest] = useState(null);
   const [form, setForm] = useState({});
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [classification, setClassification] = useState(null);
   const [history, setHistory] = useState([]);
+
+  const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [error, setError] = useState("");
   const [aiError, setAiError] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+
+  const [editing, setEditing] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+
+  const loadData = async () => {
+    try {
+      const data = await getRequestById(id);
+      setRequest(data);
+      setForm(data);
+
+      try {
+        const aiData = await getClassification(id);
+        setClassification(aiData);
+      } catch (err) {
+        if (err.response?.status !== 404) {
+          setAiError("Unable to load the AI classification.");
+        }
+      } finally {
+        setAiLoading(false);
+      }
+
+      try {
+        const histData = await getRequestStatusHistory(id);
+        setHistory(Array.isArray(histData) ? histData : []);
+      } catch {
+        setHistoryError("Could not retrieve status history.");
+      } finally {
+        setHistoryLoading(false);
+      }
+    } catch {
+      setError("This service request could not be found or is not accessible.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let active = true;
-    async function load() {
-      try {
-        const data = await getRequestById(id);
-        if (!active) return;
-        setRequest(data);
-        setForm(data);
-        try {
-          const result = await getClassification(id);
-          if (active) setClassification(result);
-        } catch (classificationError) {
-          if (active && classificationError.response?.status !== 404) setAiError("Unable to load the AI analysis.");
-        }
-        try {
-          const requestHistory = await getRequestStatusHistory(id);
-          if (active) setHistory(requestHistory);
-        } catch {
-          if (active) { setHistory([]); setHistoryError("Unable to load status history."); }
-        } finally {
-          if (active) setHistoryLoading(false);
-        }
-      } catch {
-        if (active) setError("This request could not be found or is not available to your account.");
-      } finally {
-        if (active) { setLoading(false); setAiLoading(false); }
-      }
-    }
-    load();
-    return () => { active = false; };
+    loadData();
   }, [id]);
 
   const editable = request && ["SUBMITTED", "PENDING"].includes(request.status);
-  const beginEdit = () => { setImage(null); setImagePreview(request.image ? mediaUrl(request.image) : ""); setEditing(true); };
-  const selectImage = (event) => {
-    const selected = event.target.files?.[0] || null;
-    if (!selected) return;
-    if (!IMAGE_TYPES.includes(selected.type)) return setError("Choose a JPG, PNG, or WEBP image.");
-    if (selected.size > MAX_IMAGE_SIZE) return setError("Image must be 5 MB or smaller.");
-    setError(""); setImage(selected); setImagePreview(URL.createObjectURL(selected));
-  };
-  const save = async (event) => {
-    event.preventDefault(); setBusy(true); setError("");
-    const body = new FormData();
-    ["title", "description", "location", "latitude", "longitude"].forEach((key) => body.append(key, form[key] ?? ""));
-    if (image) body.append("image", image);
-    try { const data = await updateRequest(id, body); setRequest(data); setForm(data); setEditing(false); } catch (saveError) { setError(saveError.response?.data?.detail || "Unable to save your changes."); } finally { setBusy(false); }
-  };
-  const cancel = async () => {
-    if (!window.confirm("Cancel this service request?")) return;
-    setBusy(true); try { await deleteRequest(id); navigate("/citizen/requests"); } catch (cancelError) { setError(cancelError.response?.data?.detail || "This request can no longer be cancelled."); } finally { setBusy(false); }
-  };
-  const analyze = async () => {
-    setAiBusy(true); setAiError("");
-    try { setClassification(await classifyRequest(id)); } catch (classificationError) { setAiError(classificationError.response?.data?.detail || "AI analysis could not be completed."); } finally { setAiBusy(false); }
+
+  const handleBeginEdit = () => {
+    setImage(null);
+    setImagePreview(request.image ? mediaUrl(request.image) : "");
+    setEditing(true);
   };
 
-  if (loading) return <div className="request-feedback"><span className="spinner" />Loading request...</div>;
-  if (error && !request) return <div className="request-feedback request-feedback-error"><strong>{error}</strong><Link className="button button-primary" to="/citizen/requests">Back to requests</Link></div>;
-  return <div className="request-detail-page"><Link className="back-link" to="/citizen/requests">&larr; Back to my requests</Link>{error && <p className="form-error detail-error">{error}</p>}
-    <div className="detail-header"><div><span className="request-id">REQ-{String(request.id).padStart(3, "0")}</span><h1>{request.title}</h1><div className="detail-location">&#8981; {request.location || "Location not provided"}</div></div><RequestStatus status={request.status} /></div>
-    <div className="detail-layout"><article className="detail-card">{editing ? <form className="form-stack" onSubmit={save}><Field label="Issue title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} /><label className="field"><span>Description</span><textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows="6" required /></label><Field label="Location" value={form.location || ""} onChange={(value) => setForm({ ...form, location: value })} /><div className="form-grid"><Field label="Latitude" value={form.latitude || ""} onChange={(value) => setForm({ ...form, latitude: value })} /><Field label="Longitude" value={form.longitude || ""} onChange={(value) => setForm({ ...form, longitude: value })} /></div><label className="field"><span>Replace image</span><input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={selectImage} /></label>{imagePreview && <img src={imagePreview} alt="Request evidence preview" style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: 8 }} />}<div className="detail-actions"><button className="button button-primary" disabled={busy}>Save changes</button><button type="button" className="button button-ghost" onClick={() => setEditing(false)}>Discard</button></div></form> : <><p className="detail-description">{request.description}</p>{request.image && <img className="request-image" src={mediaUrl(request.image)} alt="Attached evidence" />}<div className="detail-meta"><div><span>Location</span><strong>{request.location || "Not provided"}</strong></div><div><span>Coordinates</span><strong>{request.latitude != null && request.longitude != null ? `${request.latitude}, ${request.longitude}` : "Not provided"}</strong></div><div><span>Submitted</span><strong>{dateLabel(request.created_at)}</strong></div><div><span>Last updated</span><strong>{dateLabel(request.updated_at)}</strong></div></div>{editable && <div className="detail-actions"><button className="button button-primary" onClick={beginEdit}>Edit request</button><button className="button button-danger" onClick={cancel} disabled={busy}>Cancel request</button></div>}</>}</article></div>
-    <div className="workflow-card citizen-routing"><strong>Department:</strong> {request.department_name || "Awaiting routing"} <span className="workflow-muted">| Assigned officer: {request.assigned_officer_name || "Not assigned yet"}</span></div>
-    <RequestStatusTimeline history={history} currentStatus={request.status} loading={historyLoading} error={historyError} />
-    <AIClassification classification={classification} loading={aiLoading} busy={aiBusy} error={aiError} onAnalyze={analyze} />
-  </div>;
+  const handleSelectImage = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) return;
+    if (!IMAGE_TYPES.includes(file.type)) return setError("File must be JPG, PNG, or WEBP.");
+    if (file.size > MAX_IMAGE_SIZE) return setError("Image must be 5 MB or smaller.");
+    setError("");
+    setImage(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleSaveEdit = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+
+    const payload = new FormData();
+    ["title", "description", "location", "latitude", "longitude"].forEach((k) => {
+      if (form[k] !== undefined && form[k] !== null) payload.append(k, form[k]);
+    });
+    if (image) payload.append("image", image);
+
+    try {
+      const updated = await updateRequest(id, payload);
+      setRequest(updated);
+      setForm(updated);
+      setEditing(false);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to update service request.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    setBusy(true);
+    try {
+      await deleteRequest(id);
+      navigate("/citizen/requests");
+    } catch (err) {
+      setError(err.response?.data?.detail || "This request could not be cancelled.");
+      setCancelModalOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRunAiClassification = async () => {
+    setAiBusy(true);
+    setAiError("");
+    try {
+      const result = await classifyRequest(id);
+      setClassification(result);
+    } catch (err) {
+      setAiError(err.response?.data?.detail || "AI analysis failed. Please try again.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: "40px 0" }}>
+        <div className="cg-skeleton" style={{ height: "40px", width: "240px", marginBottom: "20px" }} />
+        <div className="cg-skeleton" style={{ height: "260px", marginBottom: "20px" }} />
+        <div className="cg-skeleton" style={{ height: "180px" }} />
+      </div>
+    );
+  }
+
+  if (error && !request) {
+    return (
+      <div className="cg-empty-state">
+        <div className="cg-empty-icon" style={{ background: "#FEEBEB", color: "var(--cg-error)" }}>
+          <Icon name="alert-triangle" size={26} />
+        </div>
+        <h3 className="cg-empty-title">Request Not Found</h3>
+        <p className="cg-empty-description">{error}</p>
+        <Link to="/citizen/requests" className="cg-btn cg-btn-primary">
+          Back to My Requests
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="cg-request-detail-page">
+      <PageHeader
+        backTo="/citizen/requests"
+        backLabel="Back to My Requests"
+        eyebrow={`Request REQ-${String(request.id).padStart(3, "0")}`}
+        title={request.title}
+        description={request.location ? `Location: ${request.location}` : "Community service request"}
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <StatusBadge status={request.status} />
+            {editable && (
+              <>
+                <Button
+                  variant="outline"
+                  size="md"
+                  icon={<Icon name="edit" size={15} />}
+                  onClick={handleBeginEdit}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="danger"
+                  size="md"
+                  icon={<Icon name="trash" size={15} />}
+                  onClick={() => setCancelModalOpen(true)}
+                >
+                  Cancel Request
+                </Button>
+              </>
+            )}
+          </div>
+        }
+      />
+
+      {error && (
+        <div className="cg-form-error" style={{ marginBottom: "20px" }}>
+          <Icon name="alert-triangle" size={16} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Main Details Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: "28px", alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {/* Issue Overview Card */}
+          <Card title="Issue Overview" subtitle="Submitted details and evidence">
+            <p style={{ fontSize: "15px", lineHeight: "1.7", color: "var(--cg-text-main)", whiteSpace: "pre-wrap", marginBottom: "24px" }}>
+              {request.description}
+            </p>
+
+            {request.image && (
+              <div style={{ marginBottom: "24px" }}>
+                <span className="cg-field-label" style={{ marginBottom: "8px" }}>Photo Evidence</span>
+                <div
+                  style={{
+                    position: "relative",
+                    borderRadius: "var(--radius-md)",
+                    overflow: "hidden",
+                    border: "1px solid var(--cg-border)",
+                    cursor: "pointer",
+                    maxWidth: "520px",
+                  }}
+                  onClick={() => setImageModalOpen(true)}
+                  title="Click to view full size"
+                >
+                  <img
+                    src={mediaUrl(request.image)}
+                    alt="Submitted community issue evidence"
+                    style={{ width: "100%", maxHeight: "320px", objectFit: "cover", display: "block" }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: "10px",
+                      right: "10px",
+                      background: "rgba(0, 0, 0, 0.7)",
+                      color: "#FFFFFF",
+                      borderRadius: "var(--radius-sm)",
+                      padding: "4px 8px",
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <Icon name="search" size={12} />
+                    <span>Expand</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Metadata Table */}
+            <div
+              style={{
+                borderTop: "1px solid var(--cg-border-light)",
+                paddingTop: "18px",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "14px 20px",
+                fontSize: "13px",
+              }}
+            >
+              <div>
+                <span className="cg-text-muted" style={{ display: "block", marginBottom: "3px" }}>Location Address</span>
+                <strong>{request.location || "Not specified"}</strong>
+              </div>
+              <div>
+                <span className="cg-text-muted" style={{ display: "block", marginBottom: "3px" }}>GPS Coordinates</span>
+                <strong>
+                  {request.latitude != null && request.longitude != null
+                    ? `${request.latitude}, ${request.longitude}`
+                    : "Not specified"}
+                </strong>
+              </div>
+              <div>
+                <span className="cg-text-muted" style={{ display: "block", marginBottom: "3px" }}>Date Submitted</span>
+                <strong>{formatDate(request.created_at)}</strong>
+              </div>
+              <div>
+                <span className="cg-text-muted" style={{ display: "block", marginBottom: "3px" }}>Last Activity</span>
+                <strong>{formatDate(request.updated_at || request.created_at)}</strong>
+              </div>
+            </div>
+          </Card>
+
+          {/* Status Progression and History */}
+          <RequestStatusTimeline
+            history={history}
+            currentStatus={request.status}
+            loading={historyLoading}
+            error={historyError}
+          />
+        </div>
+
+        {/* Sidebar: Department Routing & AI Intelligence */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {/* Department Assignment */}
+          <Card title="Department Routing" eyebrow="Operational Assignment">
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "14px" }}>
+              <div>
+                <span className="cg-text-muted" style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>
+                  Assigned Department
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Icon name="departments" size={17} style={{ color: "var(--cg-primary-green)" }} />
+                  <strong>{request.department_name || "Routing in progress"}</strong>
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--cg-border-light)", paddingTop: "12px" }}>
+                <span className="cg-text-muted" style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>
+                  Assigned Officer
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Icon name="user" size={17} style={{ color: "var(--cg-text-secondary)" }} />
+                  <span>{request.assigned_officer_name || "Awaiting officer claim"}</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* AI Classification Card */}
+          <Card
+            title="Intelligent Classification"
+            eyebrow="AI Assistant"
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                loading={aiBusy}
+                onClick={handleRunAiClassification}
+                icon={<Icon name="sparkles" size={14} />}
+              >
+                {classification ? "Re-evaluate" : "Analyze"}
+              </Button>
+            }
+          >
+            {aiLoading ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--cg-text-secondary)", fontSize: "13px" }}>
+                <span className="cg-spinner cg-spinner-sm" />
+                <span>Checking AI analysis...</span>
+              </div>
+            ) : aiError ? (
+              <div className="cg-form-error" style={{ fontSize: "13px" }}>
+                <span>{aiError}</span>
+              </div>
+            ) : !classification || classification.processing_status === "PENDING" ? (
+              <div style={{ textAlign: "center", padding: "16px 0", color: "var(--cg-text-secondary)" }}>
+                <span className="cg-spinner" style={{ marginBottom: "8px" }} />
+                <p style={{ fontSize: "13px" }}>AI classification is processing in the background...</p>
+              </div>
+            ) : classification.processing_status === "FAILED" ? (
+              <div style={{ textAlign: "center", padding: "12px 0" }}>
+                <p className="cg-text-muted" style={{ fontSize: "13px", marginBottom: "10px" }}>
+                  AI automated evaluation did not complete.
+                </p>
+                <Button variant="secondary" size="sm" onClick={handleRunAiClassification}>
+                  Retry AI Analysis
+                </Button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "13px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div style={{ background: "#F8FAF7", padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--cg-border)" }}>
+                    <span className="cg-text-muted" style={{ fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>
+                      Category
+                    </span>
+                    <strong style={{ display: "block", marginTop: "2px", color: "var(--cg-text-main)" }}>
+                      {classification.category || "General"}
+                    </strong>
+                  </div>
+
+                  <div style={{ background: "#F8FAF7", padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--cg-border)" }}>
+                    <span className="cg-text-muted" style={{ fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>
+                      Priority
+                    </span>
+                    <div style={{ marginTop: "2px" }}>
+                      <PriorityBadge priority={classification.priority} />
+                    </div>
+                  </div>
+                </div>
+
+                {classification.summary && (
+                  <div>
+                    <span className="cg-text-muted" style={{ fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>
+                      AI Summary
+                    </span>
+                    <p style={{ marginTop: "3px", color: "var(--cg-text-main)", lineHeight: "1.5" }}>
+                      {classification.summary}
+                    </p>
+                  </div>
+                )}
+
+                {classification.suggested_action && (
+                  <div>
+                    <span className="cg-text-muted" style={{ fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>
+                      Recommended Action
+                    </span>
+                    <p style={{ marginTop: "3px", color: "var(--cg-text-main)", lineHeight: "1.5" }}>
+                      {classification.suggested_action}
+                    </p>
+                  </div>
+                )}
+
+                {classification.confidence != null && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--cg-border-light)", paddingTop: "8px" }}>
+                    <span className="cg-text-muted">Classification Confidence</span>
+                    <strong>{Math.round(classification.confidence * 100)}%</strong>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      {/* Edit Request Modal */}
+      <Modal
+        open={editing}
+        onClose={() => setEditing(false)}
+        title="Edit Service Request"
+        subtitle="You can adjust details while the request is in Submitted or Pending status"
+      >
+        <form className="cg-form-stack" onSubmit={handleSaveEdit}>
+          <div className="cg-form-field">
+            <label className="cg-field-label" htmlFor="edit-title">Issue Title</label>
+            <input
+              id="edit-title"
+              type="text"
+              className="cg-input"
+              value={form.title || ""}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="cg-form-field">
+            <label className="cg-field-label" htmlFor="edit-desc">Description</label>
+            <textarea
+              id="edit-desc"
+              className="cg-textarea"
+              rows={4}
+              value={form.description || ""}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="cg-form-field">
+            <label className="cg-field-label" htmlFor="edit-location">Location</label>
+            <input
+              id="edit-location"
+              type="text"
+              className="cg-input"
+              value={form.location || ""}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
+          </div>
+
+          <div className="cg-form-row">
+            <div className="cg-form-field">
+              <label className="cg-field-label" htmlFor="edit-lat">Latitude</label>
+              <input
+                id="edit-lat"
+                type="number"
+                step="any"
+                className="cg-input"
+                value={form.latitude || ""}
+                onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+              />
+            </div>
+            <div className="cg-form-field">
+              <label className="cg-field-label" htmlFor="edit-lng">Longitude</label>
+              <input
+                id="edit-lng"
+                type="number"
+                step="any"
+                className="cg-input"
+                value={form.longitude || ""}
+                onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="cg-form-field">
+            <label className="cg-field-label">Replace Evidence Photo (optional)</label>
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              onChange={handleSelectImage}
+            />
+            {imagePreview && (
+              <img
+                src={imagePreview}
+                alt="Evidence preview"
+                style={{ width: "100%", maxHeight: "180px", objectFit: "cover", borderRadius: "8px", marginTop: "8px" }}
+              />
+            )}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+            <Button variant="ghost" onClick={() => setEditing(false)}>
+              Discard
+            </Button>
+            <Button type="submit" variant="primary" loading={busy}>
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Cancel Request Confirmation Modal */}
+      <Modal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        title="Cancel This Service Request?"
+        subtitle="This action will permanently withdraw this submission from municipal review."
+      >
+        <p style={{ fontSize: "14px", color: "var(--cg-text-secondary)", lineHeight: "1.6", marginBottom: "20px" }}>
+          Are you sure you want to cancel <strong>"{request.title}"</strong>? This will remove the issue from the department queue.
+        </p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+          <Button variant="ghost" onClick={() => setCancelModalOpen(false)} disabled={busy}>
+            Keep Request
+          </Button>
+          <Button variant="danger" loading={busy} onClick={handleCancelRequest}>
+            Yes, Cancel Request
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Photo Preview Modal */}
+      <Modal
+        open={imageModalOpen}
+        onClose={() => setImageModalOpen(false)}
+        title="Attached Evidence Photo"
+        subtitle={`REQ-${String(request.id).padStart(3, "0")} — ${request.title}`}
+        maxWidth="720px"
+      >
+        {request.image && (
+          <img
+            src={mediaUrl(request.image)}
+            alt="Full size evidence"
+            style={{ width: "100%", maxHeight: "75vh", objectFit: "contain", borderRadius: "8px" }}
+          />
+        )}
+      </Modal>
+    </div>
+  );
 }
-
-function AIClassification({ classification, loading, busy, error, onAnalyze }) {
-  if (loading) return <section className="ai-panel"><p className="ai-kicker">AI analysis</p><p className="ai-panel-message">Checking classification status...</p></section>;
-  const status = classification?.processing_status;
-  return <section className="ai-panel"><div className="ai-panel-heading"><div><p className="ai-kicker">AI analysis</p><h2>Intelligent classification</h2></div><button className="button button-primary" onClick={onAnalyze} disabled={busy}>{busy ? "Analyzing..." : status === "COMPLETED" ? "Re-analyze" : status === "FAILED" ? "Retry analysis" : "Analyze with AI"}</button></div>
-    {error && <p className="form-error">{error}</p>}
-    {status === "PENDING" && <p className="ai-panel-message">AI analysis in progress...</p>}
-    {status === "FAILED" && !error && <p className="ai-panel-message">AI analysis could not be completed. You can retry the analysis.</p>}
-    {status === "COMPLETED" && <><div className="ai-result-grid"><div><span>Category</span><strong>{classification.category}</strong></div><div><span>Priority</span><strong className={`ai-priority ai-priority-${classification.priority.toLowerCase()}`}>{classification.priority}</strong></div><div><span>Department</span><strong>{classification.department}</strong></div></div><div className="ai-copy"><span className="ai-copy-label">Summary</span><p>{classification.summary}</p></div><div className="ai-copy"><span className="ai-copy-label">Suggested action</span><p>{classification.suggested_action}</p></div><div className="ai-copy"><span className="ai-copy-label">Confidence</span><p>{Math.round(classification.confidence * 100)}%</p></div></>}
-  </section>;
-}
-
-function Field({ label, value, onChange }) { return <label className="field"><span>{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} /></label>; }

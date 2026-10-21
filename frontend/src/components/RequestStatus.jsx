@@ -1,7 +1,15 @@
-const labels = { SUBMITTED: "Submitted", PENDING: "Pending", IN_PROGRESS: "In progress", RESOLVED: "Resolved", CLOSED: "Closed" };
+import { StatusBadge, STATUS_CONFIG } from "./ui/Badge";
+
+const labels = {
+  SUBMITTED: "Submitted",
+  PENDING: "Pending",
+  IN_PROGRESS: "In progress",
+  RESOLVED: "Resolved",
+  CLOSED: "Closed",
+};
 
 export default function RequestStatus({ status }) {
-  return <span className={`request-status status-${status.toLowerCase()}`}><span className="status-dot" />{labels[status] || status}</span>;
+  return <StatusBadge status={status} />;
 }
 
-export { labels };
+export { labels, STATUS_CONFIG };

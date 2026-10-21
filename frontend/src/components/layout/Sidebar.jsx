@@ -1,24 +1,26 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import CommonGroundLogo from "../branding/CommonGroundLogo";
+import { Icon } from "../ui/Icons";
 
 const NAV = {
   citizen: [
-    { to: "/citizen/dashboard", label: "Dashboard" },
-    { to: "/citizen/requests", label: "My Requests" },
-    { to: "/citizen/requests/new", label: "Report an Issue" },
-    { to: "/profile", label: "Profile" },
+    { to: "/citizen/dashboard", label: "Dashboard", icon: "dashboard" },
+    { to: "/citizen/requests", label: "My Requests", icon: "requests" },
+    { to: "/citizen/requests/new", label: "Report an Issue", icon: "plus" },
+    { to: "/profile", label: "Profile", icon: "profile" },
   ],
   officer: [
-    { to: "/officer/dashboard", label: "Dashboard" },
-    { to: "/officer/requests", label: "Department Queue" },
-    { to: "/profile", label: "Profile" },
+    { to: "/officer/dashboard", label: "Dashboard", icon: "dashboard" },
+    { to: "/officer/requests", label: "Department Queue", icon: "requests" },
+    { to: "/profile", label: "Profile", icon: "profile" },
   ],
   admin: [
-    { to: "/admin/dashboard", label: "Dashboard" },
-    { to: "/admin/requests", label: "All Requests" },
-    { to: "/admin/departments", label: "Departments" },
-    { to: "/admin/officers", label: "Officers" },
-    { to: "/profile", label: "Profile" },
+    { to: "/admin/dashboard", label: "Dashboard", icon: "dashboard" },
+    { to: "/admin/requests", label: "All Requests", icon: "requests" },
+    { to: "/admin/departments", label: "Departments", icon: "departments" },
+    { to: "/admin/officers", label: "Officers", icon: "officers" },
+    { to: "/profile", label: "Profile", icon: "profile" },
   ],
 };
 
@@ -27,20 +29,76 @@ export default function Sidebar({ open, onClose }) {
   const items = NAV[user?.role] || [];
 
   return (
-    <aside className={`app-sidebar ${open ? "is-open" : ""}`}>
-      <div className="sidebar-header">
-        <div className="brand brand-sidebar"><span className="brand-mark">+</span><span>Common<span className="brand-light">Ground</span></span></div>
-        <button className="sidebar-close" onClick={onClose} aria-label="Close navigation">×</button>
+    <aside className={`cg-sidebar ${open ? "is-open" : ""}`} aria-label="Sidebar Navigation">
+      <div className="cg-sidebar-header">
+        <CommonGroundLogo compact={false} />
+        <button
+          className="cg-sidebar-close"
+          onClick={onClose}
+          aria-label="Close navigation menu"
+        >
+          <Icon name="close" size={20} />
+        </button>
       </div>
-      <nav className="sidebar-nav" aria-label="Main navigation">
+
+      <div className="cg-sidebar-role-indicator">
+        <span className="cg-role-dot" />
+        <span className="cg-role-label">
+          {user?.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)} Portal` : "Civic Portal"}
+        </span>
+        {user?.department_name && (
+          <span className="cg-role-dept" title={user.department_name}>
+            {user.department_name}
+          </span>
+        )}
+      </div>
+
+      <nav className="cg-sidebar-nav" aria-label="Main Navigation">
         {items.map((item) => (
-          <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item ${isActive ? "is-active" : ""}`} onClick={onClose} end={item.to === "/profile" ? false : undefined}>
-            {item.label}
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `cg-nav-link ${isActive ? "is-active" : ""}`
+            }
+            onClick={onClose}
+            end={item.to === "/profile" ? true : undefined}
+          >
+            <span className="cg-nav-icon">
+              <Icon name={item.icon} size={19} />
+            </span>
+            <span className="cg-nav-text">{item.label}</span>
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-footer">
-        <button className="nav-item signout" onClick={() => { logout(); onClose?.(); }}>Sign out</button>
+
+      <div className="cg-sidebar-footer">
+        <NavLink
+          to="/profile"
+          className="cg-user-snippet"
+          onClick={onClose}
+          title="View profile settings"
+        >
+          <div className="cg-user-avatar">
+            {user?.name?.charAt(0)?.toUpperCase() || "U"}
+          </div>
+          <div className="cg-user-info">
+            <span className="cg-user-name">{user?.name || "Civic Member"}</span>
+            <span className="cg-user-role">{user?.email || user?.role || "Citizen"}</span>
+          </div>
+        </NavLink>
+
+        <button
+          className="cg-signout-btn"
+          onClick={() => {
+            logout();
+            onClose?.();
+          }}
+          aria-label="Sign out of CommonGround"
+        >
+          <Icon name="logout" size={17} />
+          <span>Sign out</span>
+        </button>
       </div>
     </aside>
   );

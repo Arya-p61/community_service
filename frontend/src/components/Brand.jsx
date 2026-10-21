@@ -1,2 +1,5 @@
-import { Link } from "react-router-dom";
-export default function Brand() { return <Link className="brand" to="/"><span className="brand-mark">+</span><span>Common<span className="brand-light">Ground</span></span></Link>; }
+import CommonGroundLogo from "./branding/CommonGroundLogo";
+
+export default function Brand({ variant = "default" }) {
+  return <CommonGroundLogo variant={variant} />;
+}

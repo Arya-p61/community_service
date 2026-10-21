@@ -1,8 +1,13 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import RequestStatus from "../components/RequestStatus";
 import { useAuth } from "../context/AuthContext";
 import { getMyRequests } from "../services/requestService";
+import { StatusBadge } from "../components/ui/Badge";
+import PageHeader from "../components/ui/PageHeader";
+import StatCard from "../components/ui/StatCard";
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import { Icon } from "../components/ui/Icons";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -15,14 +20,7 @@ const formatDate = (value) => {
   if (!value) return "Recently";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Recently";
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
-};
-
-const formatMonthYear = (value) => {
-  if (!value) return "Recently";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently";
-  return new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
 };
 
 export default function Dashboard() {
@@ -31,235 +29,341 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    let active = true;
-
-    if (user?.role !== "citizen") {
-      setRequests([]);
+  const loadData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getMyRequests();
+      setRequests(Array.isArray(data) ? data : []);
+    } catch {
+      setError("We couldn't load your community activity. Please check your connection.");
+    } finally {
       setLoading(false);
-      return () => {
-        active = false;
-      };
     }
+  };
 
-    const fetchRequests = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await getMyRequests();
-        if (active) setRequests(Array.isArray(data) ? data : []);
-      } catch {
-        if (active) setError("We couldn't load your activity.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    fetchRequests();
-    return () => {
-      active = false;
-    };
+  useEffect(() => {
+    if (user?.role === "citizen") {
+      loadData();
+    } else {
+      setLoading(false);
+    }
   }, [user?.role]);
 
   const stats = useMemo(() => {
     const total = requests.length;
-    const active = requests.filter((request) => !["RESOLVED", "CLOSED"].includes(request.status)).length;
-    const resolved = requests.filter((request) => request.status === "RESOLVED").length;
-    const closed = requests.filter((request) => request.status === "CLOSED").length;
+    const active = requests.filter((r) => !["RESOLVED", "CLOSED"].includes(r.status)).length;
+    const resolved = requests.filter((r) => r.status === "RESOLVED").length;
+    const closed = requests.filter((r) => r.status === "CLOSED").length;
     return { total, active, resolved, closed };
   }, [requests]);
 
   const activeRequests = useMemo(() => {
     return [...requests]
-      .filter((request) => !["RESOLVED", "CLOSED"].includes(request.status))
+      .filter((r) => !["RESOLVED", "CLOSED"].includes(r.status))
       .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-      .slice(0, 3);
+      .slice(0, 4);
   }, [requests]);
 
-  const recentActivity = useMemo(() => {
+  const recentTimeline = useMemo(() => {
     return [...requests]
-      .map((request) => {
-        const timestamp = request.updated_at || request.created_at;
-        const actionMap = {
-          SUBMITTED: "Request submitted",
-          PENDING: "Request is pending",
-          IN_PROGRESS: "Status changed to In progress",
-          RESOLVED: "Request resolved",
-          CLOSED: "Request closed",
-        };
-
-        return {
-          id: request.id,
-          title: request.title,
-          action: actionMap[request.status] || "Request updated",
-          timestamp,
-        };
-      })
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 3);
+      .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+      .slice(0, 5);
   }, [requests]);
 
-  if (!user) {
-    return <div className="citizen-dashboard"><div className="panel panel-soft"><p>Loading your civic workspace…</p></div></div>;
-  }
+  const firstName = user?.name ? user.name.split(" ")[0] : "Friend";
 
   return (
-    <div className="citizen-dashboard">
-      <header className="citizen-dashboard-header">
-        <div>
-          <p className="eyebrow">Citizen workspace</p>
-          <h1>{getGreeting()}, {user.name?.split(" ")[0] || "friend"}.</h1>
-          <p>Here's what's happening with your community requests.</p>
-        </div>
-        <Link className="button button-primary" to="/citizen/requests/new">+ Report an issue</Link>
-      </header>
+    <div className="cg-dashboard-page">
+      <PageHeader
+        eyebrow="Citizen Workspace"
+        title={`${getGreeting()}, ${firstName}.`}
+        description="Here is the live status of the community issues and civic improvements you've raised."
+        actions={
+          <Link to="/citizen/requests/new" className="cg-btn cg-btn-primary cg-btn-md">
+            <Icon name="plus" size={17} />
+            <span>Report an Issue</span>
+          </Link>
+        }
+      />
 
       {loading ? (
         <DashboardSkeleton />
       ) : error ? (
-        <DashboardError onRetry={() => window.location.reload()} />
+        <Card className="cg-empty-state">
+          <div className="cg-empty-icon" style={{ background: "#FEEBEB", color: "var(--cg-error)" }}>
+            <Icon name="alert-triangle" size={24} />
+          </div>
+          <h3 className="cg-empty-title">Unable to Load Activity</h3>
+          <p className="cg-empty-description">{error}</p>
+          <Button variant="primary" onClick={loadData}>
+            Try again
+          </Button>
+        </Card>
       ) : (
         <>
-          <section className="stat-grid" aria-label="Request summary">
-            <StatCard label="Total requests" value={stats.total} />
-            <StatCard label="Active" value={stats.active} accent="coral" />
-            <StatCard label="Resolved" value={stats.resolved} accent="green" />
-            <StatCard label="Closed" value={stats.closed} accent="muted" />
-          </section>
+          {/* Stat Cards */}
+          <div className="cg-stat-grid">
+            <StatCard
+              label="Total Requests"
+              value={stats.total}
+              subtext="Issues submitted by you"
+              icon="requests"
+              accent="primary"
+              to="/citizen/requests"
+            />
+            <StatCard
+              label="Active Underway"
+              value={stats.active}
+              subtext="In review or active work"
+              icon="clock"
+              accent="coral"
+              to="/citizen/requests"
+            />
+            <StatCard
+              label="Resolved"
+              value={stats.resolved}
+              subtext="Completed by officers"
+              icon="check-circle"
+              accent="success"
+              to="/citizen/requests"
+            />
+            <StatCard
+              label="Closed"
+              value={stats.closed}
+              subtext="Archived resolutions"
+              icon="shield"
+              accent="muted"
+              to="/citizen/requests"
+            />
+          </div>
 
           {requests.length === 0 ? (
-            <section className="panel empty-state-panel">
-              <div className="empty-icon">✦</div>
-              <h2>Start making a difference</h2>
-              <p>You haven't reported a community issue yet. When you submit one, you'll be able to track its progress here.</p>
-              <Link className="button button-primary" to="/citizen/requests/new">+ Report an issue</Link>
-            </section>
+            <div className="cg-empty-state" style={{ margin: "20px 0 32px" }}>
+              <div className="cg-empty-icon">
+                <Icon name="pin" size={28} />
+              </div>
+              <h2 className="cg-empty-title">No service requests yet</h2>
+              <p className="cg-empty-description">
+                You haven't reported any community issues yet. When you notice a pothole, broken streetlight, or illegal dumping on your street, report it here to notify local service teams.
+              </p>
+              <Link to="/citizen/requests/new" className="cg-btn cg-btn-primary cg-btn-lg">
+                <Icon name="plus" size={18} />
+                <span>Report your first community issue</span>
+              </Link>
+            </div>
           ) : (
-            <div className="overview-grid">
-              <section className="panel">
-                <div className="panel-header">
-                  <div>
-                    <p className="eyebrow">Active requests</p>
-                    <h2>What's moving now</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: "24px", marginBottom: "32px" }}>
+              {/* Active Requests List */}
+              <Card
+                title="Active Requests"
+                subtitle="Community issues currently being handled"
+                action={
+                  <Link to="/citizen/requests" className="cg-back-link" style={{ margin: 0 }}>
+                    <span>View all ({requests.length})</span>
+                    <Icon name="arrow-right" size={13} />
+                  </Link>
+                }
+              >
+                {activeRequests.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--cg-text-secondary)" }}>
+                    <Icon name="check-circle" size={32} style={{ color: "var(--cg-success)", margin: "0 auto 10px" }} />
+                    <p style={{ fontWeight: 600, color: "var(--cg-text-main)" }}>All current requests resolved!</p>
+                    <p style={{ fontSize: "13px", marginTop: "4px" }}>
+                      You have no pending or in-progress requests right now.
+                    </p>
                   </div>
-                  <Link className="text-link" to="/citizen/requests">View all requests →</Link>
-                </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {activeRequests.map((request) => (
+                      <Link
+                        key={request.id}
+                        to={`/citizen/requests/${request.id}`}
+                        style={{
+                          display: "block",
+                          padding: "16px",
+                          borderRadius: "var(--radius-md)",
+                          border: "1px solid var(--cg-border)",
+                          background: "#FAFCFA",
+                          transition: "all 0.16s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = "var(--cg-primary-green)";
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = "var(--cg-border)";
+                          e.currentTarget.style.transform = "none";
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                          <span className="cg-table-id">REQ-{String(request.id).padStart(3, "0")}</span>
+                          <StatusBadge status={request.status} />
+                        </div>
+                        <h4 style={{ fontSize: "15px", fontWeight: 600, marginBottom: "6px", color: "var(--cg-text-main)" }}>
+                          {request.title}
+                        </h4>
+                        <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "12px", color: "var(--cg-text-secondary)" }}>
+                          {request.location && (
+                            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <Icon name="location" size={13} />
+                              <span>{request.location}</span>
+                            </span>
+                          )}
+                          {request.department_name && (
+                            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <Icon name="departments" size={13} />
+                              <span>{request.department_name}</span>
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Card>
 
-                <div className="active-request-list">
-                  {activeRequests.map((request) => (
-                    <Link className="request-mini-card" to={`/citizen/requests/${request.id}`} key={request.id}>
-                      <div className="mini-header">
-                        <span className="request-id">REQ-{String(request.id).padStart(3, "0")}</span>
-                        <RequestStatus status={request.status} />
-                      </div>
+              {/* Sidebar Quick Cards */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                {/* Account Summary Card */}
+                <Card title="Account Overview" eyebrow="Civic Profile">
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "18px" }}>
+                    <div className="cg-user-avatar" style={{ width: "48px", height: "48px", fontSize: "18px" }}>
+                      {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: "15px", fontWeight: 600 }}>{user?.name}</h4>
+                      <p className="cg-text-muted" style={{ fontSize: "13px" }}>{user?.email}</p>
+                    </div>
+                  </div>
 
-                      <h3>{request.title}</h3>
+                  <div style={{ borderTop: "1px solid var(--cg-border-light)", paddingTop: "14px", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span className="cg-text-muted">Account role</span>
+                      <strong style={{ textTransform: "capitalize" }}>{user?.role || "Citizen"}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span className="cg-text-muted">Phone contact</span>
+                      <strong>{user?.phone || "Not specified"}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span className="cg-text-muted">Resolved requests</span>
+                      <strong style={{ color: "var(--cg-success)" }}>{stats.resolved}</strong>
+                    </div>
+                  </div>
 
-                      <div className="mini-meta">
-                        <span>{request.department_name || "Department pending"}</span>
-                        <span>{request.location || "Location pending"}</span>
-                      </div>
+                  <Link
+                    to="/profile"
+                    className="cg-btn cg-btn-outline cg-btn-sm"
+                    style={{ width: "100%", marginTop: "18px" }}
+                  >
+                    View Account Details
+                  </Link>
+                </Card>
 
-                      <div className="mini-footer">
-                        <span>Updated {formatDate(request.updated_at || request.created_at)}</span>
-                        <span>View request →</span>
-                      </div>
+                {/* Quick Assistance */}
+                <Card title="Civic Quick Links" eyebrow="Actions">
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <Link
+                      to="/citizen/requests/new"
+                      className="cg-btn cg-btn-secondary cg-btn-md"
+                      style={{ justifyContent: "flex-start" }}
+                    >
+                      <Icon name="plus" size={16} />
+                      <span>Report a New Issue</span>
                     </Link>
-                  ))}
-                </div>
-              </section>
-
-              <aside className="sidebar-stack">
-                <div className="panel account-card">
-                  <p className="eyebrow">Your account</p>
-                  <div className="account-avatar">{user.name?.charAt(0)?.toUpperCase() || "U"}</div>
-                  <h3>{user.name}</h3>
-                  <p>{(user.role || "citizen").charAt(0).toUpperCase() + (user.role || "citizen").slice(1)}</p>
-
-                  <div className="account-meta-list">
-                    <div>
-                      <span>Member since</span>
-                      <strong>{formatMonthYear(user.created_at)}</strong>
-                    </div>
-                    <div>
-                      <span>Notifications</span>
-                      <strong>{requests.length > 0 ? "Live" : "None yet"}</strong>
-                    </div>
+                    <Link
+                      to="/citizen/requests"
+                      className="cg-btn cg-btn-outline cg-btn-md"
+                      style={{ justifyContent: "flex-start" }}
+                    >
+                      <Icon name="requests" size={16} />
+                      <span>Browse All Requests</span>
+                    </Link>
                   </div>
-
-                  <Link className="text-link" to="/profile">View profile</Link>
-                </div>
-
-                <div className="panel quick-card">
-                  <p className="eyebrow">Quick actions</p>
-                  <Link className="secondary-action" to="/citizen/requests">View all requests</Link>
-                  <Link className="secondary-action" to="/citizen/requests/new">Create a new request</Link>
-                  <Link className="secondary-action" to="/profile">Profile</Link>
-                </div>
-              </aside>
+                </Card>
+              </div>
             </div>
           )}
 
-          <section className="panel recent-activity-panel">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Recent activity</p>
-                <h2>Latest updates</h2>
-              </div>
-            </div>
-
-            {recentActivity.length === 0 ? (
-              <p className="panel-empty-copy">Your request activity will show up here as updates arrive.</p>
-            ) : (
-              <ul className="activity-list">
-                {recentActivity.map((item) => (
-                  <li key={`${item.id}-${item.action}`}>
-                    <span className="activity-bullet">✓</span>
-                    <div>
-                      <strong>{item.action}</strong>
-                      <p>{item.title}</p>
+          {/* Recent Activity Feed */}
+          {requests.length > 0 && (
+            <Card
+              title="Recent Civic Activity"
+              subtitle="Latest timeline updates across your requests"
+            >
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {recentTimeline.map((item, index) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "14px",
+                      padding: "14px 0",
+                      borderBottom: index < recentTimeline.length - 1 ? "1px solid var(--cg-border-light)" : "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        background: "var(--cg-soft-green)",
+                        color: "var(--cg-primary-green)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        marginTop: "2px",
+                      }}
+                    >
+                      <Icon name="clock" size={15} />
                     </div>
-                    <time>{formatDate(item.timestamp)}</time>
-                  </li>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                        <Link
+                          to={`/citizen/requests/${item.id}`}
+                          style={{ fontWeight: 600, fontSize: "14px", color: "var(--cg-text-main)" }}
+                        >
+                          {item.title}
+                        </Link>
+                        <span style={{ fontSize: "12px", color: "var(--cg-text-muted)" }}>
+                          {formatDate(item.updated_at || item.created_at)}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px" }}>
+                        <StatusBadge status={item.status} />
+                        {item.location && (
+                          <span style={{ fontSize: "12px", color: "var(--cg-text-secondary)" }}>
+                            • {item.location}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </ul>
-            )}
-          </section>
+              </div>
+            </Card>
+          )}
         </>
       )}
     </div>
   );
 }
 
-function StatCard({ label, value, accent = "default" }) {
-  return (
-    <div className={`stat-card stat-card-${accent}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function DashboardSkeleton() {
   return (
-    <div className="dashboard-skeleton" aria-busy="true">
-      <div className="stat-grid">
-        {[...Array(4)].map((_, index) => (
-          <div className="stat-card skeleton-block" key={index} />
+    <div>
+      <div className="cg-stat-grid">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="cg-skeleton" style={{ height: "115px" }} />
         ))}
       </div>
-      <div className="panel skeleton-panel" />
-      <div className="panel skeleton-panel small" />
-    </div>
-  );
-}
-
-function DashboardError({ onRetry }) {
-  return (
-    <div className="panel panel-error">
-      <h2>We couldn't load your activity.</h2>
-      <p>Please try again.</p>
-      <button className="button button-primary" type="button" onClick={onRetry}>Try again</button>
+      <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: "24px" }}>
+        <div className="cg-skeleton" style={{ height: "340px" }} />
+        <div className="cg-skeleton" style={{ height: "340px" }} />
+      </div>
     </div>
   );
 }
