@@ -155,4 +155,66 @@ export async function getMyFeedback() {
 export async function getAdminFeedback(params = {}) {
   const { data } = await api.get("/admin/feedback", { params });
   return data;
+}
+
+// Module 9: Analytics & Administration API
+export async function getAnalyticsOverview(params = {}) {
+  const { data } = await api.get("/admin/analytics/overview", { params });
+  return data;
+}
+
+export async function getRequestsOverTime(params = {}) {
+  const { data } = await api.get("/admin/analytics/requests-over-time", { params });
+  return data;
+}
+
+export async function getDistributionAnalytics(params = {}) {
+  const { data } = await api.get("/admin/analytics/distribution", { params });
+  return data;
+}
+
+export async function getDepartmentPerformance(params = {}) {
+  const { data } = await api.get("/admin/analytics/department-performance", { params });
+  return data;
+}
+
+export async function getOfficerWorkload(params = {}) {
+  const { data } = await api.get("/admin/analytics/officer-workload", { params });
+  return data;
+}
+
+export async function getFeedbackAnalytics(params = {}) {
+  const { data } = await api.get("/admin/analytics/feedback", { params });
+  return data;
+}
+
+export async function getRequestActivity(params = {}) {
+  const { data } = await api.get("/admin/analytics/request-activity", { params });
+  return data;
+}
+
+export async function exportAnalyticsCsv(params = {}) {
+  const response = await api.get("/admin/analytics/export-csv", {
+    params,
+    responseType: "blob",
+  });
+
+  // Extract filename from header or construct default
+  const disposition = response.headers["content-disposition"];
+  let filename = `commonground_${params.report_type || "report"}_${new Date().toISOString().slice(0, 10)}.csv`;
+  if (disposition && disposition.indexOf("filename=") !== -1) {
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    if (match && match[1]) filename = match[1];
+  }
+
+  // Trigger browser download
+  const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }

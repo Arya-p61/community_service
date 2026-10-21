@@ -13,6 +13,7 @@ from app.routers.departments import router as departments_router
 from app.routers.feedback import router as feedback_router
 from app.routers.service_requests import MEDIA_DIR, router as service_requests_router
 from app.routers.workflow import router as workflow_router
+from app.routers.analytics import router as analytics_router
 
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -41,6 +42,7 @@ app.include_router(ai_predictions_router)
 app.include_router(departments_router)
 app.include_router(workflow_router)
 app.include_router(feedback_router)
+app.include_router(analytics_router)
 app.mount("/media", StaticFiles(directory=MEDIA_DIR.parent), name="media")
 
 
