@@ -99,8 +99,19 @@ export default function AdminAnalytics() {
         getAnalyticsOverview(params), getRequestsOverTime(params), getDistributionAnalytics(params),
         getDepartmentPerformance(params), getOfficerWorkload(params), getFeedbackAnalytics(params),
       ]);
-      setOverview(ov); setTimeSeries(Array.isArray(ts?.buckets)?ts.buckets:[]); setDistribution(dist||null);
-      setDeptPerf(Array.isArray(dp)?dp:[]); setOfficerWl(Array.isArray(ow)?ow:[]); setFeedbackData(fb||null);
+      setOverview(ov);
+      const rawTs = Array.isArray(ts) ? ts : Array.isArray(ts?.buckets) ? ts.buckets : [];
+      setTimeSeries(rawTs.map((b) => ({
+        date: b.date || b.label || "",
+        label: b.date || b.label || "",
+        received: b.received ?? b.count ?? 0,
+        resolved: b.resolved ?? 0,
+        count: b.received ?? b.count ?? 0,
+      })));
+      setDistribution(dist||null);
+      setDeptPerf(Array.isArray(dp)?dp:[]);
+      setOfficerWl(Array.isArray(ow)?ow:[]);
+      setFeedbackData(fb||null);
     } catch { setError("Unable to load analytics. Please try again."); }
     finally { setLoading(false); }
   }, [filterParams]);
@@ -116,15 +127,54 @@ export default function AdminAnalytics() {
     finally { setExportBusy(false); }
   };
 
-  const statusPieData = distribution?.by_status
-    ? Object.entries(distribution.by_status).map(([name,value]) => ({name:name.replace("_"," "),value,color:STATUS_COLORS[name]||"#A0AEC0"}))
+  const statusPieData = Array.isArray(distribution?.by_status)
+    ? distribution.by_status
+        .filter((d) => (d.value ?? 0) > 0)
+        .map((d) => ({
+          name: d.label || String(d.key || "").replace("_", " "),
+          value: d.value ?? 0,
+          color: d.color || STATUS_COLORS[d.key] || "#A0AEC0",
+        }))
+    : distribution?.by_status && typeof distribution.by_status === "object"
+    ? Object.entries(distribution.by_status)
+        .filter(([, v]) => Number(v) > 0)
+        .map(([name, value]) => ({
+          name: name.replace("_", " "),
+          value: Number(value),
+          color: STATUS_COLORS[name] || "#A0AEC0",
+        }))
     : [];
-  const priorityPieData = distribution?.by_priority
-    ? Object.entries(distribution.by_priority).map(([name,value]) => ({name,value,color:PRIORITY_COLORS[name]||"#A0AEC0"}))
+
+  const priorityPieData = Array.isArray(distribution?.by_priority)
+    ? distribution.by_priority
+        .filter((d) => (d.value ?? 0) > 0)
+        .map((d) => ({
+          name: d.label || String(d.key || ""),
+          value: d.value ?? 0,
+          color: d.color || PRIORITY_COLORS[d.key] || "#A0AEC0",
+        }))
+    : distribution?.by_priority && typeof distribution.by_priority === "object"
+    ? Object.entries(distribution.by_priority)
+        .filter(([, v]) => Number(v) > 0)
+        .map(([name, value]) => ({
+          name,
+          value: Number(value),
+          color: PRIORITY_COLORS[name] || "#A0AEC0",
+        }))
     : [];
-  const deptBarData = (distribution?.by_department||[]).slice(0,10).map((d,i) => ({
-    name:d.name?.length>18?d.name.slice(0,16)+"...":d.name, fullName:d.name, count:d.count, fill:DEPT_PALETTE[i%DEPT_PALETTE.length],
-  }));
+
+  const deptBarData = (distribution?.by_department || []).slice(0, 10).map((d, i) => {
+    const name = d.label || d.name || "Department";
+    const val = d.value ?? d.count ?? 0;
+    return {
+      name: name.length > 18 ? name.slice(0, 16) + "..." : name,
+      fullName: name,
+      count: val,
+      value: val,
+      fill: DEPT_PALETTE[i % DEPT_PALETTE.length],
+    };
+  });
+
   const ratingDist = feedbackData?.rating_distribution
     ? Object.entries(feedbackData.rating_distribution).sort(([a],[b])=>Number(b)-Number(a)).map(([star,count])=>({star:Number(star),count}))
     : [];

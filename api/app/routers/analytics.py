@@ -199,6 +199,15 @@ def get_analytics_overview(
         else 0.0
     )
 
+    ai_classified_count = 0
+    if all_req_ids:
+        ai_classified_count = db.scalar(
+            select(func.count(func.distinct(AIPrediction.service_request_id))).where(
+                AIPrediction.service_request_id.in_(all_req_ids),
+                AIPrediction.processing_status == AIProcessingStatus.COMPLETED,
+            )
+        ) or 0
+
     return OverviewAnalytics(
         total_requests=total_requests,
         submitted_requests=submitted_count,
@@ -208,10 +217,21 @@ def get_analytics_overview(
         closed_requests=closed_count,
         unassigned_requests=unassigned_count,
         unrouted_requests=unrouted_count,
+        ai_classified_count=ai_classified_count,
         avg_resolution_time_hours=avg_resolution_hours,
         avg_satisfaction_rating=avg_satisfaction,
         total_feedback_count=len(feedback_ratings),
         resolution_rate_percent=resolution_rate,
+        submitted_count=submitted_count,
+        pending_count=pending_count,
+        in_progress_count=in_progress_count,
+        resolved_count=resolved_count,
+        closed_count=closed_count,
+        unassigned_count=unassigned_count,
+        unrouted_count=unrouted_count,
+        resolution_rate=resolution_rate,
+        avg_resolution_hours=avg_resolution_hours,
+        avg_satisfaction=avg_satisfaction,
     )
 
 
@@ -287,7 +307,13 @@ def get_requests_over_time(
 
     sorted_keys = sorted(buckets.keys())
     return [
-        TimeBucket(date=k, received=buckets[k]["received"], resolved=buckets[k]["resolved"])
+        TimeBucket(
+            date=k,
+            received=buckets[k]["received"],
+            resolved=buckets[k]["resolved"],
+            label=k,
+            count=buckets[k]["received"],
+        )
         for k in sorted_keys
     ]
 
@@ -470,6 +496,10 @@ def get_department_performance(
                 resolution_rate_percent=resolution_rate,
                 officer_count=officers_per_dept.get(dept.id, 0),
                 avg_satisfaction_rating=avg_rating,
+                open_requests=unassigned + pending + in_progress,
+                resolution_rate=resolution_rate,
+                avg_resolution_hours=avg_res_time,
+                avg_rating=avg_rating,
             )
         )
 
@@ -564,6 +594,10 @@ def get_officer_workload(
                 total_handled_period=len(total_handled_ids),
                 resolved_period=len(all_resolved_ids),
                 avg_resolution_time_hours=avg_res_time,
+                open_requests=active_assigned_count,
+                resolved_requests=len(all_resolved_ids),
+                total_assigned=len(total_handled_ids),
+                avg_resolution_hours=avg_res_time,
             )
         )
 
@@ -612,12 +646,15 @@ def get_feedback_analytics(
     all_depts = {d.id: d.name for d in db.scalars(select(Department)).all()}
     dept_summaries = []
     for d_id, d_ratings in dept_map.items():
+        avg_d = round(sum(d_ratings) / len(d_ratings), 2) if d_ratings else None
         dept_summaries.append(
             DepartmentFeedbackSummary(
                 department_id=d_id,
                 department_name=all_depts.get(d_id, "Department"),
-                average_rating=round(sum(d_ratings) / len(d_ratings), 2) if d_ratings else None,
+                average_rating=avg_d,
                 total_submissions=len(d_ratings),
+                feedback_count=len(d_ratings),
+                avg_rating=avg_d,
             )
         )
     dept_summaries.sort(key=lambda x: x.total_submissions, reverse=True)
@@ -635,12 +672,27 @@ def get_feedback_analytics(
         for fb, req in pairs[:15]
     ]
 
+    total_resolved_period = db.scalar(
+        select(func.count(ServiceRequest.id)).where(
+            ServiceRequest.status.in_([ServiceRequestStatus.RESOLVED, ServiceRequestStatus.CLOSED])
+        )
+    ) or 0
+    feedback_rate = (
+        round((total_submissions / total_resolved_period) * 100.0, 1)
+        if total_resolved_period > 0 and total_submissions > 0
+        else None
+    )
+
     return FeedbackAnalyticsResponse(
         average_rating=avg_rating,
         total_submissions=total_submissions,
         rating_distribution=rating_dist,
         department_summaries=dept_summaries,
         recent_feedback=recent,
+        total_feedback=total_submissions,
+        avg_rating=avg_rating,
+        feedback_rate=feedback_rate,
+        department_feedback=dept_summaries,
     )
 
 

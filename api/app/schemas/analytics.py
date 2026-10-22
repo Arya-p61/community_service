@@ -11,16 +11,31 @@ class OverviewAnalytics(BaseModel):
     closed_requests: int
     unassigned_requests: int
     unrouted_requests: int
-    avg_resolution_time_hours: float | None
-    avg_satisfaction_rating: float | None
-    total_feedback_count: int
-    resolution_rate_percent: float
+    ai_classified_count: int = 0
+    avg_resolution_time_hours: float | None = None
+    avg_satisfaction_rating: float | None = None
+    total_feedback_count: int = 0
+    resolution_rate_percent: float = 0.0
+
+    # Frontend convenience aliases
+    submitted_count: int = 0
+    pending_count: int = 0
+    in_progress_count: int = 0
+    resolved_count: int = 0
+    closed_count: int = 0
+    unassigned_count: int = 0
+    unrouted_count: int = 0
+    resolution_rate: float = 0.0
+    avg_resolution_hours: float | None = None
+    avg_satisfaction: float | None = None
 
 
 class TimeBucket(BaseModel):
     date: str
     received: int
     resolved: int
+    label: str = ""
+    count: int = 0
 
 
 class DistributionItem(BaseModel):
@@ -53,6 +68,12 @@ class DepartmentPerformanceItem(BaseModel):
     officer_count: int
     avg_satisfaction_rating: float | None
 
+    # Frontend convenience aliases
+    open_requests: int = 0
+    resolution_rate: float = 0.0
+    avg_resolution_hours: float | None = None
+    avg_rating: float | None = None
+
 
 class OfficerWorkloadItem(BaseModel):
     officer_id: int
@@ -65,6 +86,12 @@ class OfficerWorkloadItem(BaseModel):
     total_handled_period: int
     resolved_period: int
     avg_resolution_time_hours: float | None
+
+    # Frontend convenience aliases
+    open_requests: int = 0
+    resolved_requests: int = 0
+    total_assigned: int = 0
+    avg_resolution_hours: float | None = None
 
 
 class RecentFeedbackItem(BaseModel):
@@ -82,6 +109,8 @@ class DepartmentFeedbackSummary(BaseModel):
     department_name: str
     average_rating: float | None
     total_submissions: int
+    feedback_count: int = 0
+    avg_rating: float | None = None
 
 
 class FeedbackAnalyticsResponse(BaseModel):
@@ -90,6 +119,12 @@ class FeedbackAnalyticsResponse(BaseModel):
     rating_distribution: dict[str, int]
     department_summaries: list[DepartmentFeedbackSummary]
     recent_feedback: list[RecentFeedbackItem]
+
+    # Frontend convenience aliases
+    total_feedback: int = 0
+    avg_rating: float | None = None
+    feedback_rate: float | None = None
+    department_feedback: list[DepartmentFeedbackSummary] = []
 
 
 class StatusTransitionCount(BaseModel):
